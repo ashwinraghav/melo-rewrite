@@ -1,5 +1,6 @@
 /**
  * StoryCard component tests.
+ * Updated to match the Stitch-aligned card layout.
  */
 
 import { describe, it, expect, vi } from 'vitest'
@@ -29,27 +30,22 @@ describe('StoryCard', () => {
     expect(screen.getByText('The Sleepy Rabbit')).toBeInTheDocument()
   })
 
-  it('renders story description', () => {
+  it('shows duration and label', () => {
     render(<StoryCard story={STORY} />)
-    expect(screen.getByText('A gentle story about a rabbit.')).toBeInTheDocument()
+    expect(screen.getByText('3 min · Calm')).toBeInTheDocument()
   })
 
-  it('shows duration badge for short stories', () => {
-    render(<StoryCard story={STORY} />)
-    expect(screen.getByText('< 5 min')).toBeInTheDocument()
+  it('shows Gentle label for medium stories', () => {
+    render(<StoryCard story={{ ...STORY, durationSeconds: 480, durationCategory: 'medium' }} />)
+    expect(screen.getByText('8 min · Gentle')).toBeInTheDocument()
   })
 
-  it('shows duration badge for medium stories', () => {
-    render(<StoryCard story={{ ...STORY, durationCategory: 'medium' }} />)
-    expect(screen.getByText('5–15 min')).toBeInTheDocument()
+  it('shows Dreamy label for long stories', () => {
+    render(<StoryCard story={{ ...STORY, durationSeconds: 1200, durationCategory: 'long' }} />)
+    expect(screen.getByText('20 min · Dreamy')).toBeInTheDocument()
   })
 
-  it('shows duration badge for long stories', () => {
-    render(<StoryCard story={{ ...STORY, durationCategory: 'long' }} />)
-    expect(screen.getByText('15+ min')).toBeInTheDocument()
-  })
-
-  it('renders cover art with alt text', () => {
+  it('renders cover art', () => {
     render(<StoryCard story={STORY} />)
     const img = screen.getByRole('img', { name: 'The Sleepy Rabbit' })
     expect(img).toHaveAttribute('src', STORY.coverArtUrl)
@@ -65,5 +61,11 @@ describe('StoryCard', () => {
   it('renders as a button for keyboard accessibility', () => {
     render(<StoryCard story={STORY} />)
     expect(screen.getByRole('button')).toBeInTheDocument()
+  })
+
+  it('uses material icon fallback when no cover art', () => {
+    render(<StoryCard story={{ ...STORY, coverArtUrl: '' }} />)
+    // Should show material icon instead of img
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
   })
 })

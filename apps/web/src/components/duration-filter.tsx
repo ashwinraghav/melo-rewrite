@@ -24,8 +24,8 @@ export function DurationFilter({ selected, onChange }: DurationFilterProps) {
           className={cn(
             'flex-shrink-0 rounded-full px-4 py-2 font-body text-sm font-medium transition-all duration-300',
             selected === value
-              ? 'bg-primary text-on-primary'
-              : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high',
+              ? 'bg-secondary-container text-on-secondary-container'
+              : 'glass-card text-on-surface-variant hover:bg-surface-container-high/40',
           )}
         >
           {label}
