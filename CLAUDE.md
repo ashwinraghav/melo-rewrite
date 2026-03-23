@@ -69,14 +69,21 @@ No Redux, no Zustand — keep it simple.
 
 ## Design system
 
-From the Stitch project "Editorial Serenity" (project ID 13037681786636023062):
+From the Stitch project "Editorial Serenity" (project ID 13037681786636023062).
+**Light theme** — warm cream backgrounds (#fffcf7), earth-dusted pastels.
+
 - Primary font: Plus Jakarta Sans (display/headings)
 - Body font: Lexend (body text)
-- No hard borders — use surface tiers for separation
+- **No borders** — use surface container tiers for separation ("No-Line" rule)
+- **No pure black/white** — always use system tokens
 - Minimum tap target: 4rem (64px)
 - All transitions: 300ms ease-in-out
 - Corner radius: minimum 0.5rem, standard 1rem
-- Glassmorphic player bar: `bg-surface/85 backdrop-blur-[20px]`
+- Primary buttons: gradient from `primary` to `primary-dim`, rounded-full
+- Selection chips: `secondary-container` bg, no borders
+- Glassmorphic player/nav: `surface-bright` at 80% opacity, 12px backdrop-blur
+- Ambient shadows: 32px blur, 6% opacity, tinted `on-surface`
+- Ghost borders only: `outline-variant` at 15% opacity max
 
 ## Infrastructure
 

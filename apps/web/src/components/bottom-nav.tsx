@@ -41,7 +41,7 @@ export function BottomNav() {
 
   return (
     <nav
-      className="player-bar fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-outline-variant/20 pb-safe pt-2"
+      className="player-bar fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around pb-safe pt-2"
       aria-label="Main navigation"
     >
       {TABS.map(({ href, label, icon: Icon }) => {

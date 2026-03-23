@@ -95,7 +95,7 @@ export default function OnboardingPage() {
                     className={`flex h-16 items-center justify-center rounded-xl font-display text-lg font-medium transition-all duration-300 ${
                       childAge === age
                         ? 'bg-primary text-on-primary'
-                        : 'bg-surface-container text-on-surface hover:bg-surface-container-high'
+                        : 'bg-surface-container-low text-on-surface hover:bg-surface-container'
                     }`}
                   >
                     {age}
@@ -128,8 +128,8 @@ export default function OnboardingPage() {
                     onClick={() => toggleTopic(topic.id)}
                     className={`rounded-full px-5 py-2.5 font-body text-sm font-medium transition-all duration-300 ${
                       selectedTopics.includes(topic.id)
-                        ? 'bg-primary-container text-primary'
-                        : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
+                        ? 'bg-secondary-container text-on-secondary-container'
+                        : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
                     }`}
                   >
                     {topic.label}
@@ -146,7 +146,7 @@ export default function OnboardingPage() {
               <div className="mt-8 flex gap-3">
                 <button
                   onClick={() => setStep('age')}
-                  className="flex-1 rounded-full bg-surface-container py-4 font-body text-sm font-medium text-on-surface-variant"
+                  className="flex-1 rounded-full bg-surface-container-high py-4 font-body text-sm font-medium text-on-surface-variant"
                 >
                   Back
                 </button>

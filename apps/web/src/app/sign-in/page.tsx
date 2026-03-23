@@ -3,10 +3,8 @@
 /**
  * Sign-in page.
  *
- * Single action: sign in with Google. No email/password in v1 — keeps the
- * auth surface minimal and leverages Google's security.
- *
- * Design: dark glassmorphic card centred on screen, Mello wordmark above.
+ * Single action: sign in with Google. Editorial Serenity aesthetic —
+ * warm cream background, glassmorphic card, soft ambient glow.
  */
 
 import { useEffect } from 'react'
@@ -24,12 +22,13 @@ export default function SignInPage() {
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center px-6">
-      {/* Ambient background glow */}
+      {/* Ambient background glow — soft green tint */}
       <div
         className="pointer-events-none absolute inset-0 -z-10"
         aria-hidden
       >
-        <div className="absolute left-1/2 top-1/3 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/10 blur-[80px]" />
+        <div className="absolute left-1/2 top-1/3 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary-container/40 blur-[100px]" />
+        <div className="absolute right-1/4 top-2/3 h-64 w-64 rounded-full bg-secondary-container/30 blur-[80px]" />
       </div>
 
       <motion.div
@@ -48,23 +47,22 @@ export default function SignInPage() {
           </p>
         </div>
 
-        {/* Card */}
-        <div className="rounded-2xl bg-surface-container p-8">
+        {/* Card — surface tier shift, no borders */}
+        <div className="rounded-2xl bg-surface-container-low p-8 shadow-ambient">
           <p className="mb-6 text-center text-sm text-on-surface-variant">
             Sign in to continue
           </p>
 
           <button
             onClick={signInWithGoogle}
-            className="flex w-full items-center justify-center gap-3 rounded-full bg-primary px-6 py-4 font-body text-sm font-medium text-on-primary transition-all duration-300 hover:brightness-110 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary"
+            className="flex w-full items-center justify-center gap-3 rounded-full bg-gradient-to-br from-primary to-primary-dim px-6 py-4 font-body text-sm font-medium text-on-primary transition-all duration-300 hover:brightness-105 active:scale-[0.98]"
           >
-            {/* Google icon */}
             <GoogleIcon />
             Continue with Google
           </button>
         </div>
 
-        <p className="mt-8 text-center text-xs text-on-surface-variant/60">
+        <p className="mt-8 text-center text-xs text-on-surface-variant/50">
           By continuing, you agree to our Terms of Service and Privacy Policy.
         </p>
       </motion.div>
