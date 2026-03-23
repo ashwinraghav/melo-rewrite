@@ -43,7 +43,6 @@ export function createApiClient(getToken: GetTokenFn) {
     body?: unknown,
   ): Promise<T> {
     const token = await getToken()
-    console.log('[api-client]', method, path, 'token:', token ? `${token.slice(0, 20)}...` : 'NULL')
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     }

@@ -13,7 +13,7 @@ class Config:
     ]
     audio_url_ttl_seconds: int = int(os.environ.get("AUDIO_URL_TTL_SECONDS", "900"))
     port: int = int(os.environ.get("PORT", "8080"))
-    node_env: str = os.environ.get("NODE_ENV", "development")
+    env: str = os.environ.get("ENV", "development")
 
 
 config = Config()
