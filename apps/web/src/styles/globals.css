@@ -3,13 +3,9 @@
  *
  * RGB channels (no alpha) so Tailwind opacity modifiers work.
  *
- * Colors derived from the Stitch "Editorial Serenity" system
- * (projectId: 13037681786636023062), dark-adapted:
- *   - Same hues (forest green primary, amber secondary)
- *   - Surface tiers inverted for dark backgrounds
- *   - Primary/secondary lightened for dark-bg legibility
- *
- * Dark theme is default. Light kept below for future toggle.
+ * Colors extracted directly from the Stitch "Editorial Serenity"
+ * dark screen HTML (projectId: 13037681786636023062).
+ * Dark theme is default.
  */
 
 @tailwind base;
@@ -19,52 +15,56 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Lexend:wght@300;400;500&display=swap');
 
 /* ─── Editorial Serenity — Dark (default) ─────────────────────────────── */
+/* Extracted from Stitch dark screen CSS variables                         */
 :root {
-  /* Backgrounds — dark forest, same warmth as the light cream */
-  --color-background:               14 18 16;     /* #0e1210 */
-  --color-surface:                  20 25 22;     /* #14191a */
-  --color-surface-bright:           42 50 46;     /* #2a322e */
-  --color-surface-dim:              14 18 16;     /* #0e1210 */
-  --color-surface-container-lowest: 10 13 11;     /* #0a0d0b */
-  --color-surface-container-low:    22 28 25;     /* #161c19 */
-  --color-surface-container:        28 35 31;     /* #1c231f */
-  --color-surface-container-high:   36 43 39;     /* #242b27 */
-  --color-surface-container-highest: 44 52 47;    /* #2c342f */
+  /* Backgrounds — deep navy */
+  --color-background:               6 14 32;      /* #060e20 */
+  --color-surface:                  6 14 32;      /* #060e20 */
+  --color-surface-bright:           23 43 84;     /* #172b54 */
+  --color-surface-dim:              6 14 32;      /* #060e20 */
+  --color-surface-container-lowest: 0 0 0;        /* #000000 */
+  --color-surface-container-low:    8 19 41;      /* #081329 */
+  --color-surface-container:        12 25 52;     /* #0c1934 */
+  --color-surface-container-high:   16 30 62;     /* #101e3e */
+  --color-surface-container-highest: 20 36 73;    /* #142449 */
 
-  /* Text — warm off-white, never pure white */
-  --color-on-surface:               228 227 218;  /* #e4e3da */
-  --color-on-surface-variant:       158 156 148;  /* #9e9c94 */
+  /* Text — light blue-white */
+  --color-on-surface:               222 229 255;  /* #dee5ff */
+  --color-on-surface-variant:       155 170 214;  /* #9baad6 */
 
-  /* Primary — forest green, lightened for dark bg */
-  --color-primary:                  163 196 174;  /* #a3c4ae — Stitch primary_fixed_dim equivalent */
-  --color-primary-dim:              142 175 153;  /* #8eaf99 */
-  --color-primary-container:        45 68 55;     /* #2d4437 — Stitch on_primary_fixed */
-  --color-primary-fixed:            206 233 214;  /* #cee9d6 */
-  --color-on-primary:               22 42 30;     /* #162a1e */
-  --color-on-primary-container:     192 219 201;  /* #c0dbc9 */
+  /* Primary — soft blue */
+  --color-primary:                  150 188 255;  /* #96bcff */
+  --color-primary-dim:              114 161 238;  /* #72a1ee */
+  --color-primary-container:        128 175 253;  /* #80affd */
+  --color-primary-fixed:            160 194 255;  /* #a0c2ff */
+  --color-on-primary:               0 56 114;     /* #003872 */
+  --color-on-primary-container:     0 46 95;      /* #002e5f */
 
-  /* Secondary — warm amber, lightened for dark bg */
-  --color-secondary:                236 208 172;  /* #ecd0ac — Stitch secondary_fixed_dim */
-  --color-secondary-dim:            220 189 145;  /* #dcbd91 */
-  --color-secondary-container:      75 59 32;     /* #4b3b20 */
-  --color-on-secondary:             30 20 6;      /* #1e1406 */
-  --color-on-secondary-container:   251 222 185;  /* #fbdeb9 */
+  /* Secondary — soft lavender */
+  --color-secondary:                211 188 252;  /* #d3bcfc */
+  --color-secondary-dim:            197 174 237;  /* #c5aeed */
+  --color-secondary-container:      45 27 80;     /* #2d1b50 */
+  --color-on-secondary:             73 54 108;    /* #49366c */
+  --color-on-secondary-container:   175 153 215;  /* #af99d7 */
 
-  /* Tertiary — soft blue-grey, lightened */
-  --color-tertiary:                 211 222 238;  /* #d3deee */
-  --color-tertiary-container:       59 69 83;     /* #3b4553 */
-  --color-on-tertiary:              30 36 44;     /* #1e242c */
+  /* Tertiary — mint green */
+  --color-tertiary:                 188 255 224;  /* #bcffe0 */
+  --color-tertiary-container:       160 243 207;  /* #a0f3cf */
+  --color-on-tertiary:              1 103 75;     /* #01674b */
 
   /* Outline */
-  --color-outline:                  100 100 93;   /* #64645d */
-  --color-outline-variant:          55 55 50;     /* #373732 */
+  --color-outline:                  101 117 158;  /* #65759e */
+  --color-outline-variant:          56 71 109;    /* #38476d */
 
   /* Error */
-  --color-error:                    250 116 111;  /* #fa746f — Stitch error_container */
+  --color-error:                    253 111 133;  /* #fd6f85 */
 
-  /* Glassmorphism — dark surface at 80% + 12px blur */
-  --player-bg: rgb(20 25 22 / 0.80);
+  /* Glassmorphism — from Stitch .glass-card */
+  --player-bg: rgba(20, 36, 73, 0.4);
   --player-blur: 12px;
+
+  /* Background gradient used on Stitch dark screens */
+  --bg-gradient: radial-gradient(circle at center, #172b54 0%, #060e20 100%);
 }
 
 /* ─── Editorial Serenity — Light ──────────────────────────────────────── */
@@ -93,9 +93,6 @@
   --color-secondary-container:      251 222 185;
   --color-on-secondary:             255 255 255;
   --color-on-secondary-container:   98 78 50;
-  --color-tertiary:                 90 101 115;
-  --color-tertiary-container:       225 236 253;
-  --color-on-tertiary:              255 255 255;
   --color-outline:                  129 129 122;
   --color-outline-variant:          187 185 178;
   --color-error:                    175 61 59;
@@ -119,10 +116,10 @@ html {
 
 body {
   @apply bg-background text-on-surface font-body;
+  background-image: var(--bg-gradient);
+  background-attachment: fixed;
   overscroll-behavior: none;
   min-height: 100dvh;
-  /* Subtle grain texture for editorial feel */
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
 }
 
 /* ─── Typography scale ──────────────────────────────────────────────────── */
@@ -150,9 +147,15 @@ h1, h2, h3, h4 {
   @apply bg-outline rounded-full;
 }
 
-/* ─── Audio player glassmorphic bar ─────────────────────────────────────── */
+/* ─── Glassmorphic surfaces ─────────────────────────────────────────────── */
 
 .player-bar {
+  background: var(--player-bg);
+  backdrop-filter: blur(var(--player-blur));
+  -webkit-backdrop-filter: blur(var(--player-blur));
+}
+
+.glass-card {
   background: var(--player-bg);
   backdrop-filter: blur(var(--player-blur));
   -webkit-backdrop-filter: blur(var(--player-blur));

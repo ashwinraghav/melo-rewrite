@@ -27,8 +27,8 @@ export default function SignInPage() {
         className="pointer-events-none absolute inset-0 -z-10"
         aria-hidden
       >
-        <div className="absolute left-1/2 top-1/3 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary-container/40 blur-[100px]" />
-        <div className="absolute right-1/4 top-2/3 h-64 w-64 rounded-full bg-secondary-container/30 blur-[80px]" />
+        <div className="absolute left-1/2 top-1/3 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/10 blur-[100px]" />
+        <div className="absolute right-1/4 top-2/3 h-64 w-64 rounded-full bg-tertiary/8 blur-[80px]" />
       </div>
 
       <motion.div
@@ -48,14 +48,14 @@ export default function SignInPage() {
         </div>
 
         {/* Card — surface tier shift, no borders */}
-        <div className="rounded-2xl bg-surface-container p-8 shadow-ambient">
+        <div className="glass-card rounded-2xl p-8">
           <p className="mb-6 text-center text-sm text-on-surface-variant">
             Sign in to continue
           </p>
 
           <button
             onClick={signInWithGoogle}
-            className="flex w-full items-center justify-center gap-3 rounded-full bg-gradient-to-br from-primary to-primary-dim px-6 py-4 font-body text-sm font-medium text-on-primary transition-all duration-300 hover:brightness-105 active:scale-[0.98]"
+            className="flex w-full items-center justify-center gap-3 rounded-full bg-primary px-6 py-4 font-body text-sm font-medium text-on-primary transition-all duration-300 hover:brightness-110 active:scale-[0.98]"
           >
             <GoogleIcon />
             Continue with Google
