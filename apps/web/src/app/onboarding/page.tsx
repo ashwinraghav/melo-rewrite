@@ -95,7 +95,7 @@ export default function OnboardingPage() {
                     className={`flex h-16 items-center justify-center rounded-xl font-display text-lg font-medium transition-all duration-300 ${
                       childAge === age
                         ? 'bg-primary text-on-primary'
-                        : 'bg-surface-container-low text-on-surface hover:bg-surface-container'
+                        : 'bg-surface-container text-on-surface hover:bg-surface-container-high'
                     }`}
                   >
                     {age}

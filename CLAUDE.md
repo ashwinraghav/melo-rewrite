@@ -70,7 +70,7 @@ No Redux, no Zustand — keep it simple.
 ## Design system
 
 From the Stitch project "Editorial Serenity" (project ID 13037681786636023062).
-**Light theme** — warm cream backgrounds (#fffcf7), earth-dusted pastels.
+**Dark theme** is default. Same hues from the Stitch light palette, adapted for dark backgrounds.
 
 - Primary font: Plus Jakarta Sans (display/headings)
 - Body font: Lexend (body text)

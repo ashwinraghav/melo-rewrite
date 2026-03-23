@@ -48,7 +48,7 @@ export default function SignInPage() {
         </div>
 
         {/* Card — surface tier shift, no borders */}
-        <div className="rounded-2xl bg-surface-container-low p-8 shadow-ambient">
+        <div className="rounded-2xl bg-surface-container p-8 shadow-ambient">
           <p className="mb-6 text-center text-sm text-on-surface-variant">
             Sign in to continue
           </p>
