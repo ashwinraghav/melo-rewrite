@@ -1,0 +1,144 @@
+/**
+ * Global styles — design tokens and base resets.
+ *
+ * All color values are defined as RGB channels (no alpha) so Tailwind's
+ * opacity modifier syntax works: `bg-background/80`, `text-on-surface/60`.
+ *
+ * Token names mirror the Stitch "Editorial Serenity" design system exported
+ * from the project (projectId: 13037681786636023062).
+ *
+ * Dark theme is the PRIMARY mode. The `.light` class on <html> activates the
+ * light theme — add it if you ever build a light mode toggle.
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Lexend:wght@300;400;500&display=swap');
+
+/* ─── Dark theme (default) ─────────────────────────────────────────────── */
+:root {
+  /* Backgrounds */
+  --color-background:               14 18 16;   /* deep dark forest */
+  --color-surface:                  22 28 25;
+  --color-surface-container:        28 34 31;
+  --color-surface-container-high:   34 41 38;
+  --color-surface-container-highest: 40 48 44;
+
+  /* Text */
+  --color-on-surface:               228 227 218; /* #e4e3da */
+  --color-on-surface-variant:       172 172 164; /* #acacA4 */
+
+  /* Primary — forest green, lightened for dark bg */
+  --color-primary:                  163 196 174; /* #a3c4ae */
+  --color-primary-container:        45 68 55;    /* #2d4437 */
+  --color-on-primary:               22 42 30;
+
+  /* Secondary — warm amber */
+  --color-secondary:                220 189 145; /* #dcbd91 */
+  --color-secondary-container:      75 59 32;
+  --color-on-secondary:             30 20 6;
+
+  /* Outline */
+  --color-outline:                  100 100 93;  /* #64645d */
+  --color-outline-variant:          55 55 50;
+
+  /* Error */
+  --color-error:                    255 100 100;
+
+  /* Glassmorphism player bar */
+  --player-bg: rgb(22 28 25 / 0.85);
+  --player-blur: 20px;
+}
+
+/* ─── Light theme ───────────────────────────────────────────────────────── */
+/* Uncomment and apply .light to <html> if you ever add a theme toggle */
+/*
+.light {
+  --color-background:               255 252 247;
+  --color-surface:                  255 252 247;
+  --color-surface-container:        246 243 236;
+  --color-surface-container-high:   240 238 230;
+  --color-surface-container-highest: 234 232 224;
+  --color-on-surface:               56 56 51;
+  --color-on-surface-variant:       101 101 94;
+  --color-primary:                  81 106 91;
+  --color-primary-container:        206 233 214;
+  --color-on-primary:               255 255 255;
+  --color-secondary:                118 97 67;
+  --color-secondary-container:      251 222 185;
+  --color-on-secondary:             255 255 255;
+  --color-outline:                  129 129 122;
+  --color-outline-variant:          187 185 178;
+  --color-error:                    175 61 59;
+}
+*/
+
+/* ─── Base ──────────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  /* Prevent font size inflation on mobile */
+  -webkit-text-size-adjust: 100%;
+  /* Smooth scroll for anchor links */
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-background text-on-surface font-body;
+  /* Prevent overscroll bounce on iOS — keeps the app feel */
+  overscroll-behavior: none;
+  /* Ensure full-height layout on mobile */
+  min-height: 100dvh;
+  /* Grain texture overlay for editorial feel */
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+}
+
+/* ─── Typography scale ──────────────────────────────────────────────────── */
+
+h1, h2, h3, h4 {
+  @apply font-display;
+  letter-spacing: -0.02em;
+}
+
+/* ─── Focus styles ──────────────────────────────────────────────────────── */
+
+:focus-visible {
+  @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-background;
+}
+
+/* ─── Scrollbar (desktop) ───────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-outline rounded-full;
+}
+
+/* ─── Audio player glassmorphic bar ─────────────────────────────────────── */
+
+.player-bar {
+  background: var(--player-bg);
+  backdrop-filter: blur(var(--player-blur));
+  -webkit-backdrop-filter: blur(var(--player-blur));
+}
+
+/* ─── Utility: no scrollbar ─────────────────────────────────────────────── */
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

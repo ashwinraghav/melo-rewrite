@@ -1,0 +1,117 @@
+# Mello — Architecture
+
+## Overview
+
+Mello is a mobile-first web application for distributing calm, lo-fi audio stories to young children. A parent signs in, configures a child age + preferred topics, and plays stories directly in the browser. There are no child accounts, no downloads, and no payments in v1.
+
+---
+
+## System Diagram
+
+```
+Browser (mobile-first web)
+        │
+        │  HTTPS
+        ▼
+  ┌─────────────┐          ┌──────────────────┐
+  │  apps/web   │ ──API──► │   apps/api        │
+  │  (Next.js)  │          │  (Fastify)        │
+  │  Cloud Run  │          │  Cloud Run        │
+  └─────────────┘          └────────┬─────────┘
+        │                           │
+  Firebase Auth              ┌──────┴──────────┐
+  (client SDK)               │                 │
+                         Firestore       Cloud Storage
+                         (metadata)      (audio + art)
+```
+
+---
+
+## Services
+
+### apps/web (Next.js 14, App Router)
+- Mobile-first responsive UI
+- Firebase Auth web SDK for authentication
+- TanStack Query for server state
+- Framer Motion for transitions (300ms ease-in-out per design spec)
+- Deployed to Cloud Run as a standalone Next.js build
+
+### apps/api (Fastify, Node.js)
+- Single monolith — no microservices
+- Verifies Firebase ID tokens on every request
+- All Firestore / Cloud Storage access goes here; the browser never touches GCP directly
+- Deployed to Cloud Run
+- Repository pattern: business logic never imports Firestore directly
+
+### packages/types
+- Shared TypeScript types between api and web
+- Single source of truth for domain objects, API shapes, and constants
+
+---
+
+## Authentication Flow
+
+1. User opens the app → root page checks auth state
+2. Not signed in → redirect to `/sign-in`
+3. User taps "Continue with Google" → Firebase Auth popup
+4. Firebase returns an ID token (JWT) to the browser
+5. Web app includes `Authorization: Bearer <id-token>` on every API call
+6. API verifies the token using Firebase Admin SDK
+7. `request.user.uid` is available to all route handlers
+
+---
+
+## Data Access Pattern
+
+```
+Route handler
+    │
+    ▼
+Repository interface  ←── injected at startup
+    │
+    ├── MemoryRepository (tests)
+    └── FirestoreRepository (production)
+```
+
+**Why repositories?**
+- Tests run without GCP credentials (fast, offline, CI-friendly)
+- Swapping Firestore for another database is a one-file change per repository
+- Business logic (validation, filtering) is readable without Firestore specifics
+
+---
+
+## Story Audio Delivery
+
+Stories are stored as MP3 files in Cloud Storage. The API never streams audio bytes — instead:
+
+1. Client fetches story details: `GET /v1/stories/:id`
+2. API generates a short-lived signed URL (15 min TTL) for the audio file
+3. Client passes the URL directly to the `<audio>` element
+4. Cloud Storage serves the audio; the API is not in the critical path
+
+This keeps the API stateless and cheap. Cloud CDN can be added in front of Cloud Storage for latency improvements without any code changes.
+
+---
+
+## Deployment
+
+Both services deploy to Cloud Run:
+- **No Kubernetes** in v1 — Cloud Run handles scaling automatically
+- Each service has its own `Dockerfile`
+- Environment variables are set per service in Cloud Run (not committed to git)
+- Application Default Credentials (ADC) are used on Cloud Run — no service account keys
+
+---
+
+## Key Decisions
+
+See `docs/adr/` for full decision records.
+
+| Decision | Choice | Rationale |
+|---|---|---|
+| Mobile framework | Next.js (web, not native) | Stitch mocks are HTML/CSS; web is sufficient |
+| API framework | Fastify | Better TypeScript, faster than Express |
+| Database | Firestore | Already on GCP, serverless, no ops overhead |
+| Auth | Firebase Auth | Free, handles Google OAuth, ID tokens work with GCP IAM |
+| Monorepo tool | pnpm + Turborepo | Fast installs, correct dependency graph |
+| Testing | Vitest | Works with both Node and jsdom, same config for API and web |

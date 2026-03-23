@@ -1,0 +1,12 @@
+{
+  "name": "@mello/api",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "uvicorn mello_api.asgi:app --reload --host 0.0.0.0 --port 8080",
+    "build": "echo 'Python: no build step'",
+    "start": "uvicorn mello_api.asgi:app --host 0.0.0.0 --port 8080",
+    "test": "pytest tests/ -v",
+    "lint": "ruff check mello_api/ tests/"
+  }
+}

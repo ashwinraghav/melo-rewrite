@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+
+# Build outputs
+dist/
+.next/
+.turbo/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# GCP service account keys — NEVER commit these
+*.json
+!package.json
+!tsconfig*.json
+!turbo.json
+!vitest.config*.json
+!**/fixtures/**/*.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Test coverage
+coverage/
+
+# Cloud Run / Docker
+.dockerignore
