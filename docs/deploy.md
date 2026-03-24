@@ -1,117 +1,90 @@
-# Deploying Mello to Cloud Run
+# Deploying Mello
 
-All infrastructure is managed by Terraform. Never run `gcloud run deploy` manually — Cloud Build handles deploys via `terraform apply`.
+All infrastructure is managed by Terraform. Frontend deploys via Firebase CLI.
+
+## Architecture
+
+- **Web**: Static Next.js export → Firebase Hosting (CDN)
+- **API**: Python Docker container → Cloud Run
+- **Infra**: Terraform in `infra/terraform/`
+
+## Quick deploy (after initial setup)
+
+```bash
+./scripts/deploy-web.sh        # Frontend → Firebase Hosting (~15s)
+./scripts/deploy-api.sh        # API → Cloud Run (~60s)
+./scripts/deploy-all.sh        # Both
+./scripts/test-all.sh          # Run all tests without deploying
+```
+
+Add `--skip-tests` to skip the test step.
 
 ## Prerequisites
 
-- `gcloud` CLI installed and authenticated (`gcloud auth application-default login`)
-- Terraform ≥ 1.5.7 (or OpenTofu) installed
+- `gcloud` CLI installed and authenticated
+- `gcloud auth application-default login` with quota project set
+- Terraform ≥ 1.5.7
+- Docker Desktop running (for API deploys)
+- `firebase-tools` installed (`npm i -g firebase-tools`)
 - `pnpm` installed
 
 ## First-time bootstrap
 
-The Terraform state bucket must exist before `terraform init`. Create it once manually:
+### 1. Terraform state bucket (one-time manual step)
 
 ```bash
 gcloud storage buckets create gs://melo-f5756-tfstate \
-  --project=melo-f5756 \
-  --location=US \
-  --uniform-bucket-level-access
+  --project=melo-f5756 --location=US --uniform-bucket-level-access
 ```
 
-Then initialise and apply:
+### 2. Terraform init + apply
 
 ```bash
 cd infra/terraform
-cp terraform.tfvars.example terraform.tfvars
-# terraform.tfvars already has the correct values for melo-f5756
-
-terraform init    # downloads providers, configures GCS backend
-terraform plan    # review what will be created
-terraform apply   # create all resources
+terraform init
+terraform plan
+terraform apply
 ```
 
-On first apply the Cloud Run services will start with a placeholder "hello" image — this is expected. The real images are deployed by CI/CD.
+This creates: GCP APIs, Cloud Run API service, Artifact Registry, Cloud Storage bucket, service account + IAM, Firebase Hosting site.
 
-## Importing existing GCP resources
-
-The `melo-f5756` GCP project, Firestore database, and Firebase web app already exist. Import them so Terraform can manage them without destroying and recreating:
+### 3. Build and deploy API
 
 ```bash
-cd infra/terraform
-
-# GCP APIs (import each enabled service individually)
-terraform import 'google_project_service.apis["run.googleapis.com"]'              melo-f5756/run.googleapis.com
-terraform import 'google_project_service.apis["cloudbuild.googleapis.com"]'       melo-f5756/cloudbuild.googleapis.com
-terraform import 'google_project_service.apis["artifactregistry.googleapis.com"]' melo-f5756/artifactregistry.googleapis.com
-terraform import 'google_project_service.apis["firestore.googleapis.com"]'        melo-f5756/firestore.googleapis.com
-terraform import 'google_project_service.apis["firebase.googleapis.com"]'         melo-f5756/firebase.googleapis.com
-terraform import 'google_project_service.apis["identitytoolkit.googleapis.com"]'  melo-f5756/identitytoolkit.googleapis.com
-terraform import 'google_project_service.apis["storage.googleapis.com"]'          melo-f5756/storage.googleapis.com
-terraform import 'google_project_service.apis["secretmanager.googleapis.com"]'    melo-f5756/secretmanager.googleapis.com
-terraform import 'google_project_service.apis["iam.googleapis.com"]'              melo-f5756/iam.googleapis.com
-terraform import 'google_project_service.apis["cloudresourcemanager.googleapis.com"]' melo-f5756/cloudresourcemanager.googleapis.com
-
-# Storage bucket (if already created)
-terraform import google_storage_bucket.stories melo-f5756/melo-f5756-stories
-
-# Artifact Registry (if already created)
-terraform import google_artifact_registry_repository.mello projects/melo-f5756/locations/us-central1/repositories/mello
+./scripts/deploy-api.sh
 ```
 
-Resources that don't yet exist (service accounts, Cloud Run services, IAM bindings) will be **created** by Terraform on `apply` — no import needed.
-
-## CI/CD deploy flow (Cloud Build)
-
-Every push to `main` triggers Cloud Build which:
-
-1. Builds Docker images for `apps/api` and `apps/web`
-2. Pushes them to Artifact Registry
-3. Runs `terraform apply -var="api_image=<digest>" -var="web_image=<digest>"`
-
-This means deployments are always atomic: infra changes and image updates happen in the same `apply`.
-
-## Manual image deploy (emergency)
+### 4. Build and deploy web
 
 ```bash
-# Build and push API image
-docker build -t us-central1-docker.pkg.dev/melo-f5756/mello/api:manual apps/api
-docker push us-central1-docker.pkg.dev/melo-f5756/mello/api:manual
-
-# Deploy via Terraform
-cd infra/terraform
-terraform apply \
-  -var="api_image=us-central1-docker.pkg.dev/melo-f5756/mello/api:manual"
+./scripts/deploy-web.sh
 ```
 
-## Outputs
-
-After `terraform apply`:
+## Production URLs
 
 ```bash
-terraform output api_url              # https://mello-api-xxxx-uc.a.run.app
-terraform output web_url              # https://mello-web-xxxx-uc.a.run.app
-terraform output artifact_registry_url  # us-central1-docker.pkg.dev/melo-f5756/mello
+terraform -chdir=infra/terraform output api_url    # https://mello-api-rhp2tqs5qa-uc.a.run.app
+terraform -chdir=infra/terraform output web_url    # https://melo-f5756.web.app
 ```
+
+Custom domain: `https://melobooks.com` (Firebase Hosting)
 
 ## Local development
 
 ```bash
-# Install deps
+# API (Python)
+cd apps/api
+source .venv/bin/activate
+pip install -e ".[dev]"
+uvicorn mello_api.asgi:app --reload --port 8080
+
+# Web (Next.js)
 pnpm install
-
-# Copy env files
-cp apps/api/.env.example apps/api/.env
-cp apps/web/.env.local.example apps/web/.env.local
-
-# Run both services
-pnpm dev
-# API → http://localhost:8080
-# Web → http://localhost:3000
+pnpm --filter @mello/web dev
 ```
 
 Tests run fully offline — no GCP credentials needed:
 
 ```bash
-pnpm test
+./scripts/test-all.sh
 ```
