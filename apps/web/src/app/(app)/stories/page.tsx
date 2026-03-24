@@ -17,13 +17,10 @@ import { Icon } from '@/components/icon'
 import type { PaginatedResponse, StoryWithAudioUrl } from '@mello/types'
 
 const TOPIC_ICONS: Record<string, string> = {
-  nature: 'forest',
-  space: 'rocket_launch',
-  friendship: 'diversity_1',
-  animals: 'pets',
-  ocean: 'tsunami',
-  magic: 'magic_button',
-  dreams: 'bedtime',
+  park: 'park',
+  friends: 'groups',
+  bedtime: 'bedtime',
+  food: 'restaurant',
 }
 
 function formatDuration(s: number): string {

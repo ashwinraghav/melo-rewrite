@@ -2,11 +2,10 @@
 
 /**
  * Discover page — topic picker.
- * Matches "Choose Topic (Dark) - Fixed" from Stitch exactly:
- * - Back button + "Celestial Slumber" header
- * - "Choose a Topic" / "Select a dream to explore tonight"
- * - Vertical list of topic cards with chevron_right
- * - 3-item bottom nav
+ * Matches "Choose Topic (Dark)" from Stitch:
+ * - Staggered glassmorphic card grid (even cards offset 1.5rem)
+ * - Child-appropriate themes: Park, Friends, Bedtime, Food
+ * - "Daily Magic" surprise section
  */
 
 import { useRouter } from 'next/navigation'
@@ -15,11 +14,10 @@ import { useAuthContext } from '@/context/auth-context'
 import { Icon } from '@/components/icon'
 
 const TOPICS = [
-  { id: 'nature', label: 'Nature', subtitle: 'Whispering trees and calm rivers', icon: 'forest' },
-  { id: 'space', label: 'Space', subtitle: 'Floating among the friendly stars', icon: 'rocket_launch' },
-  { id: 'friendship', label: 'Friends', subtitle: 'Kind adventures with new pals', icon: 'diversity_1' },
-  { id: 'animals', label: 'Animals', subtitle: 'Sleepy kittens and gentle giants', icon: 'pets' },
-  { id: 'ocean', label: 'Deep Blue', subtitle: 'A peaceful swim through coral reefs', icon: 'tsunami' },
+  { id: 'park', label: 'Going to the Park', subtitle: 'Exploring nature and playing in the sunshine together.', icon: 'park' },
+  { id: 'friends', label: 'Making Friends', subtitle: 'Kind words and sharing toys with new playmates.', icon: 'groups' },
+  { id: 'bedtime', label: 'Bedtime Routine', subtitle: 'Brushing teeth and cozying up for a peaceful night.', icon: 'bedtime' },
+  { id: 'food', label: 'Trying New Foods', subtitle: 'Discovering delicious flavors and colorful treats.', icon: 'restaurant' },
 ]
 
 export default function DiscoverPage() {
@@ -28,16 +26,12 @@ export default function DiscoverPage() {
 
   return (
     <div className="px-6 py-8 pb-28">
-      {/* Header — matches mock */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
-      >
-        <div className="mb-6 flex items-center gap-3">
+      {/* Header */}
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+        <div className="mb-1 flex items-center gap-3">
           <Icon name="auto_stories" size={28} className="text-primary" />
           <h1 className="font-display text-2xl font-bold tracking-tight text-on-surface">
-            Celestial Slumber
+            Storybook
           </h1>
           <button
             onClick={signOut}
@@ -48,48 +42,74 @@ export default function DiscoverPage() {
           </button>
         </div>
 
-        <h2 className="font-display text-xl font-semibold text-on-surface">
+        <h2 className="mt-6 font-display text-xl font-semibold text-on-surface">
           Choose a Topic
         </h2>
         <p className="mt-1 font-body text-sm text-on-surface-variant">
-          Select a dream to explore tonight
+          Select a gentle theme for tonight&apos;s magical journey.
         </p>
       </motion.div>
 
-      {/* Topic list — vertical cards with chevron per Stitch mock */}
+      {/* Topic grid — staggered cards per Stitch mock */}
       <motion.div
         initial="hidden"
         animate="show"
         variants={{
           hidden: {},
-          show: { transition: { staggerChildren: 0.06 } },
+          show: { transition: { staggerChildren: 0.08 } },
         }}
-        className="space-y-3"
+        className="grid grid-cols-2 gap-3"
       >
-        {TOPICS.map((topic) => (
+        {TOPICS.map((topic, i) => (
           <motion.button
             key={topic.id}
             variants={{
-              hidden: { opacity: 0, y: 12 },
+              hidden: { opacity: 0, y: 16 },
               show: { opacity: 1, y: 0 },
             }}
             onClick={() => router.push(`/stories/length?topics=${topic.id}`)}
-            className="glass-card flex w-full items-center gap-4 rounded-[1rem] p-5 text-left transition-all duration-300 hover:bg-surface-container-high/40 active:scale-[0.98]"
+            className="glass-card flex flex-col items-start gap-3 rounded-[1rem] p-5 text-left transition-all duration-300 hover:bg-surface-container-high/40 active:scale-[0.97]"
+            style={i % 2 === 1 ? { transform: 'translateY(1.5rem)' } : undefined}
           >
-            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10">
-              <Icon name={topic.icon} size={26} className="text-primary" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <span className="font-display text-base font-semibold text-on-surface">
+            <Icon name={topic.icon} size={28} className="text-primary" />
+            <div>
+              <span className="font-display text-sm font-semibold text-on-surface">
                 {topic.label}
               </span>
-              <p className="mt-0.5 font-body text-xs text-on-surface-variant">
+              <p className="mt-1 font-body text-xs leading-relaxed text-on-surface-variant">
                 {topic.subtitle}
               </p>
             </div>
-            <Icon name="chevron_right" size={22} className="flex-shrink-0 text-on-surface-variant" />
           </motion.button>
         ))}
+      </motion.div>
+
+      {/* Daily Magic — surprise section per Stitch mock */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+        className="glass-card mt-12 rounded-[2rem] p-6"
+      >
+        <div className="mb-3 flex items-center gap-2">
+          <Icon name="auto_awesome" size={20} className="text-tertiary" />
+          <span className="font-body text-xs uppercase tracking-widest text-tertiary">
+            Daily Magic
+          </span>
+        </div>
+        <h2 className="font-display text-xl font-semibold text-on-surface mb-2">
+          Surprise Adventure
+        </h2>
+        <p className="font-body text-sm leading-relaxed text-on-surface-variant mb-5">
+          Let the stars decide! We&apos;ll pick a gentle story for you based on tonight&apos;s moon.
+        </p>
+        <button
+          onClick={() => router.push('/stories')}
+          className="flex items-center gap-2 rounded-full bg-primary px-6 py-3 font-body text-sm font-medium text-on-primary transition-all duration-300 hover:brightness-110 active:scale-[0.98]"
+        >
+          <Icon name="casino" size={18} />
+          Spin the Galaxy
+        </button>
       </motion.div>
     </div>
   )
