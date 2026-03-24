@@ -49,7 +49,9 @@ pnpm --filter @mello/web test
 Add new queries by: (1) updating the interface, (2) implementing in `memory.py`, (3) implementing in `firestore.py`.
 
 **Auth (API):** Firebase ID token verified in `apps/api/mello_api/middleware/auth.py`.
-In tests, pass `x-test-uid` header to bypass Firebase token verification.
+**EVERY new API route under `/v1/` MUST use `Depends(get_current_user)`** — no unauthenticated
+endpoints except `/health`. The test bypass (`x-test-uid` header) is disabled in production
+(`ENV=production`). Never add routes that skip auth without explicit approval.
 
 **Design tokens:** All colors come from CSS variables in `apps/web/src/styles/globals.css`.
 Never use raw hex values in Tailwind classes — use semantic tokens like `bg-surface`, `text-on-surface`.

@@ -54,10 +54,7 @@ resource "google_cloud_run_v2_service" "api" {
         name  = "AUDIO_URL_TTL_SECONDS"
         value = tostring(var.audio_url_ttl_seconds)
       }
-      env {
-        name  = "PORT"
-        value = "8080"
-      }
+      # PORT is set automatically by Cloud Run — do not set it manually
 
       ports {
         container_port = 8080

@@ -51,22 +51,25 @@ resource "google_cloud_run_v2_service_iam_member" "api_public" {
 }
 
 # ── Cloud Build service account permissions ────────────────────────────────────
-
-# Allow Cloud Build to push images to Artifact Registry and deploy to Cloud Run.
-resource "google_project_iam_member" "cloudbuild_run_admin" {
-  project = var.project_id
-  role    = "roles/run.admin"
-  member  = "serviceAccount:${var.project_number}@cloudbuild.gserviceaccount.com"
-}
-
-resource "google_project_iam_member" "cloudbuild_artifact_writer" {
-  project = var.project_id
-  role    = "roles/artifactregistry.writer"
-  member  = "serviceAccount:${var.project_number}@cloudbuild.gserviceaccount.com"
-}
-
-resource "google_project_iam_member" "cloudbuild_sa_user" {
-  project = var.project_id
-  role    = "roles/iam.serviceAccountUser"
-  member  = "serviceAccount:${var.project_number}@cloudbuild.gserviceaccount.com"
-}
+#
+# NOTE: The Cloud Build service account (PROJECT_NUMBER@cloudbuild.gserviceaccount.com)
+# is auto-created on first Cloud Build usage. Uncomment these after running
+# the first build, or after enabling Cloud Build in the console.
+#
+# resource "google_project_iam_member" "cloudbuild_run_admin" {
+#   project = var.project_id
+#   role    = "roles/run.admin"
+#   member  = "serviceAccount:${var.project_number}@cloudbuild.gserviceaccount.com"
+# }
+#
+# resource "google_project_iam_member" "cloudbuild_artifact_writer" {
+#   project = var.project_id
+#   role    = "roles/artifactregistry.writer"
+#   member  = "serviceAccount:${var.project_number}@cloudbuild.gserviceaccount.com"
+# }
+#
+# resource "google_project_iam_member" "cloudbuild_sa_user" {
+#   project = var.project_id
+#   role    = "roles/iam.serviceAccountUser"
+#   member  = "serviceAccount:${var.project_number}@cloudbuild.gserviceaccount.com"
+# }

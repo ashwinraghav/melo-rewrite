@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 from dataclasses import dataclass
 from fastapi import HTTPException, Header
 from typing import Optional
@@ -10,6 +11,10 @@ class AuthenticatedUser:
     email: str | None
 
 
+# Test bypass is ONLY available when ENV != "production"
+_ALLOW_TEST_BYPASS = os.environ.get("ENV", "development") != "production"
+
+
 def get_current_user(
     authorization: Optional[str] = Header(default=None),
     x_test_uid: Optional[str] = Header(default=None),
@@ -18,10 +23,12 @@ def get_current_user(
     """
     FastAPI dependency that resolves the authenticated user.
 
-    In tests: pass X-Test-Uid header to bypass Firebase token verification.
+    Every /v1/* route MUST use this dependency. No exceptions.
+
     In production: requires a valid Firebase ID token in the Authorization header.
+    In tests/dev only: X-Test-Uid header bypasses Firebase verification.
     """
-    if x_test_uid:
+    if _ALLOW_TEST_BYPASS and x_test_uid:
         return AuthenticatedUser(uid=x_test_uid, email=x_test_email)
 
     if not authorization or not authorization.startswith("Bearer "):
