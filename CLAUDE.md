@@ -100,6 +100,30 @@ From the Stitch project "Editorial Serenity" (project ID 13037681786636023062).
 **GCP project:** `melo-f5756` (project number `888632552624`)
 **Region:** `us-central1`
 **Artifact Registry:** `us-central1-docker.pkg.dev/melo-f5756/mello/`
+**API URL:** `https://mello-api-rhp2tqs5qa-uc.a.run.app`
+**Web URL:** `https://melo-f5756.web.app` / `https://melobooks.com`
+
+## Deploying changes
+
+When the user asks to deploy, use these scripts:
+
+```bash
+./scripts/deploy-web.sh        # Frontend only (test → build → firebase deploy)
+./scripts/deploy-api.sh        # API only (test → docker build → push → terraform apply)
+./scripts/deploy-all.sh        # Both
+./scripts/test-all.sh          # Run all tests without deploying
+```
+
+Add `--skip-tests` to skip the test step when iterating fast.
+
+**Workflow for a typical change:**
+1. Make the code change
+2. Run `./scripts/test-all.sh` to verify
+3. Run the appropriate deploy script
+4. The script handles build, push, and deploy automatically
+
+**Web changes** are near-instant (static files to CDN).
+**API changes** take ~60s (docker build + push + terraform apply + Cloud Run rollout).
 
 See `docs/deploy.md` for full Terraform workflow and first-time bootstrap.
 See `docs/adr/` for architectural decisions.
