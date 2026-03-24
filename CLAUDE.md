@@ -101,7 +101,7 @@ From the Stitch project "Editorial Serenity" (project ID 13037681786636023062).
 **Region:** `us-central1`
 **Artifact Registry:** `us-central1-docker.pkg.dev/melo-f5756/mello/`
 **API URL:** `https://mello-api-rhp2tqs5qa-uc.a.run.app`
-**Web URL:** `https://melo-f5756.web.app` / `https://melobooks.com`
+**Web URL:** `https://melo-f5756.web.app` / `https://melostories.com` / `https://melobooks.com`
 
 ## Deploying changes
 

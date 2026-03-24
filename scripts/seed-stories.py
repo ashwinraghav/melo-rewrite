@@ -9,6 +9,7 @@ Usage:
 
 Reads from scripts/stories-output/manifest.json.
 Uploads audio to gs://melo-f5756-stories/stories/{id}/audio.mp3
+Uploads covers to gs://melo-f5756-stories/stories/{id}/cover.webp
 Creates/updates documents in Firestore collection 'stories'.
 """
 
@@ -80,6 +81,19 @@ def main():
                 print(f"  Uploaded audio ({audio_local.stat().st_size} bytes)")
         else:
             print(f"  WARNING: Audio file not found at {audio_local}")
+
+        # Upload cover art to GCS
+        cover_local = OUTPUT_DIR / "covers" / f"{story_id}.webp"
+        cover_gcs_path = f"stories/{story_id}/cover.webp"
+        if cover_local.exists():
+            if args.dry_run:
+                print(f"  Would upload {cover_local} -> gs://{BUCKET_NAME}/{cover_gcs_path}")
+            else:
+                blob = bucket.blob(cover_gcs_path)
+                blob.upload_from_filename(str(cover_local), content_type="image/webp")
+                print(f"  Uploaded cover ({cover_local.stat().st_size} bytes)")
+        else:
+            print(f"  NOTE: No cover art at {cover_local} (run generate-covers.py first)")
 
         # Create Firestore document
         doc_data = {

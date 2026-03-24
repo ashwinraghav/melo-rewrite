@@ -24,3 +24,13 @@ output "api_service_account" {
   description = "Email of the API service account"
   value       = google_service_account.api.email
 }
+
+output "dns_nameservers" {
+  description = "Nameservers for melobooks.com — set these at the registrar (Squarespace)"
+  value       = google_dns_managed_zone.melobooks.name_servers
+}
+
+output "melostories_nameservers" {
+  description = "Nameservers for melostories.com (managed by Cloud Domains)"
+  value       = google_dns_managed_zone.melostories.name_servers
+}

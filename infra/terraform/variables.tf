@@ -34,5 +34,5 @@ variable "cors_origins" {
   description = "Comma-separated CORS origins allowed for the API"
   type        = string
   # Firebase Hosting default + custom domains (comma-separated)
-  default     = "https://melo-f5756.web.app,https://melobooks.com,https://www.melobooks.com"
+  default     = "https://melo-f5756.web.app,https://melobooks.com,https://www.melobooks.com,https://melostories.com,https://www.melostories.com"
 }

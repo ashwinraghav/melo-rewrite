@@ -168,6 +168,16 @@ export default function PlayerPage() {
           transition={{ duration: 0.25 }}
           className="px-6 pt-6"
         >
+          {/* Cover art */}
+          {story.coverArtUrl && (
+            <div className="mx-auto mb-5 h-48 w-48 overflow-hidden rounded-2xl bg-surface-container-high shadow-lg shadow-surface-container-lowest/20">
+              <img
+                src={story.coverArtUrl}
+                alt={story.title}
+                className="h-full w-full object-cover"
+              />
+            </div>
+          )}
           <div className="mb-2 flex flex-wrap gap-1.5">
             {story.topics.map((topic) => (
               <span

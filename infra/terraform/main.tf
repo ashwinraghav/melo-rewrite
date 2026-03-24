@@ -18,6 +18,7 @@ locals {
     "secretmanager.googleapis.com",    # Secret Manager (future use)
     "iam.googleapis.com",              # IAM
     "cloudresourcemanager.googleapis.com",
+    "dns.googleapis.com",              # Cloud DNS (custom domain)
   ]
 }
 

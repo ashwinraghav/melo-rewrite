@@ -158,10 +158,21 @@ export default function StoriesPage() {
             onClick={() => playStory(story.id)}
             className="flex w-full items-center gap-4 rounded-[1rem] p-3 text-left transition-all duration-300 hover:bg-surface-container-high/30 active:scale-[0.98]"
           >
-            {/* Track number */}
-            <span className="w-6 text-center font-body text-sm text-on-surface-variant">
-              {index + 1}
-            </span>
+            {/* Cover art thumbnail */}
+            <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-xl bg-surface-container-high">
+              {story.coverArtUrl ? (
+                <img
+                  src={story.coverArtUrl}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center">
+                  <span className="font-body text-sm text-on-surface-variant">{index + 1}</span>
+                </div>
+              )}
+            </div>
 
             {/* Info */}
             <div className="min-w-0 flex-1">
