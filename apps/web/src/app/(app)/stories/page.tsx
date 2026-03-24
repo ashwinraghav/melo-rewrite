@@ -2,17 +2,33 @@
 
 /**
  * Story list page.
- * Matches "Story List (Dark) - Fixed" from Stitch.
+ * Matches "Story List (Dark) - Fixed" from Stitch:
+ * - "Tonight's Stories" header
+ * - Featured "Tonight's Special" card
+ * - Vertical glass cards with icon, title, topic, duration, play button
  */
 
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { useApiClient } from '@/hooks/useApiClient'
-import { StoryCard } from '@/components/story-card'
 import { DurationFilter } from '@/components/duration-filter'
 import { Icon } from '@/components/icon'
 import type { PaginatedResponse, StoryWithAudioUrl } from '@mello/types'
+
+const TOPIC_ICONS: Record<string, string> = {
+  nature: 'forest',
+  space: 'rocket_launch',
+  friendship: 'diversity_1',
+  animals: 'pets',
+  ocean: 'tsunami',
+  magic: 'magic_button',
+  dreams: 'bedtime',
+}
+
+function formatDuration(s: number): string {
+  return `${Math.floor(s / 60)} min`
+}
 
 export default function StoriesPage() {
   const searchParams = useSearchParams()
@@ -22,17 +38,17 @@ export default function StoriesPage() {
   const topics = searchParams.get('topics') ?? ''
   const duration = searchParams.get('duration') ?? ''
 
-  const queryString = new URLSearchParams()
-  if (topics) queryString.set('topics', topics)
-  if (duration) queryString.set('duration', duration)
+  const qs = new URLSearchParams()
+  if (topics) qs.set('topics', topics)
+  if (duration) qs.set('duration', duration)
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['stories', topics, duration],
-    queryFn: () =>
-      client.getList<StoryWithAudioUrl>(`/v1/stories?${queryString.toString()}`),
+    queryFn: () => client.getList<StoryWithAudioUrl>(`/v1/stories?${qs.toString()}`),
   })
 
   const stories = (data as PaginatedResponse<StoryWithAudioUrl> | undefined)?.data ?? []
+  const featured = stories[0]
 
   const setDuration = (d: string) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -41,107 +57,109 @@ export default function StoriesPage() {
     router.replace(`/stories?${params.toString()}`)
   }
 
-  const title = topics ? topics.charAt(0).toUpperCase() + topics.slice(1) : 'All Stories'
-
   return (
-    <div className="px-6 py-10">
+    <div className="px-6 py-8 pb-28">
       {/* Header */}
-      <div className="mb-2 flex items-center gap-3">
-        <button
-          onClick={() => router.back()}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-high/40"
-          aria-label="Go back"
-        >
-          <Icon name="arrow_back" size={20} className="text-on-surface" />
-        </button>
-        <h1 className="font-display text-2xl font-semibold text-on-surface">
-          {title}
-        </h1>
-      </div>
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+        <div className="mb-4 flex items-center gap-3">
+          <button
+            onClick={() => router.push('/discover')}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-high/40"
+            aria-label="Back"
+          >
+            <Icon name="arrow_back" size={20} className="text-on-surface" />
+          </button>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-on-surface">
+            Tonight&apos;s Stories
+          </h1>
+        </div>
 
-      {!isLoading && (
-        <p className="mb-6 ml-[3.25rem] font-body text-xs text-on-surface-variant">
-          {stories.length} {stories.length === 1 ? 'story' : 'stories'} available
-        </p>
-      )}
-
-      {/* Duration filter */}
-      <DurationFilter selected={duration} onChange={setDuration} />
+        {/* Duration filter chips */}
+        <DurationFilter selected={duration} onChange={setDuration} />
+      </motion.div>
 
       {/* Featured — "Tonight's Special" */}
-      {stories.length > 0 && !isLoading && (
+      {featured && !isLoading && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="glass-card mt-6 rounded-[2rem] p-6"
+          className="glass-card mb-6 overflow-hidden rounded-[2rem] p-6"
         >
-          <div className="flex items-center gap-2 mb-2">
-            <Icon name="nights_stay" size={18} className="text-secondary" />
+          <div className="mb-2 flex items-center gap-2">
+            <Icon name="nights_stay" size={16} className="text-secondary" />
             <span className="font-body text-xs uppercase tracking-widest text-secondary">
               Tonight&apos;s Special
             </span>
           </div>
-          <h2 className="font-display text-lg font-medium text-on-surface mb-1">
-            {stories[0]!.title}
-          </h2>
-          <p className="font-body text-sm text-on-surface-variant mb-4">
-            {stories[0]!.description}
-          </p>
+          <h2 className="font-display text-xl font-semibold text-on-surface">{featured.title}</h2>
+          <p className="mt-1 font-body text-sm text-on-surface-variant">{featured.description}</p>
+          <div className="mt-2 flex items-center gap-1 font-body text-xs text-on-surface-variant">
+            <Icon name="schedule" size={14} />
+            <span>{formatDuration(featured.durationSeconds)} read</span>
+          </div>
           <button
-            onClick={() => router.push(`/stories/${stories[0]!.id}`)}
-            className="flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 font-body text-sm font-medium text-on-primary transition-all duration-300 hover:brightness-110 active:scale-[0.98]"
+            onClick={() => router.push(`/stories/${featured.id}`)}
+            className="mt-4 flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 font-body text-sm font-medium text-on-primary transition-all duration-300 hover:brightness-110 active:scale-[0.98]"
           >
-            <Icon name="auto_stories" size={18} />
+            <Icon name="play_circle" size={18} />
             Start Dreaming
           </button>
         </motion.div>
       )}
 
-      {/* Story list */}
+      {/* Loading */}
       {isLoading && (
-        <div className="mt-6 space-y-3">
+        <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="glass-card h-[4.5rem] animate-pulse rounded-[1rem]" />
+            <div key={i} className="glass-card h-20 animate-pulse rounded-[1rem]" />
           ))}
         </div>
       )}
 
-      {isError && (
-        <p className="mt-8 text-center text-sm text-on-surface-variant">
-          Something went wrong. Please try again.
-        </p>
-      )}
-
-      {!isLoading && !isError && stories.length === 0 && (
+      {/* Empty state */}
+      {!isLoading && stories.length === 0 && (
         <div className="mt-12 flex flex-col items-center gap-3">
           <Icon name="search_off" size={48} className="text-on-surface-variant/30" />
-          <p className="text-sm text-on-surface-variant">No stories found. Try a different filter.</p>
+          <p className="text-sm text-on-surface-variant">No stories found.</p>
         </div>
       )}
 
+      {/* Story list — horizontal cards matching mock */}
       <motion.div
         initial="hidden"
         animate="show"
-        variants={{
-          hidden: {},
-          show: { transition: { staggerChildren: 0.05 } },
-        }}
-        className="mt-4 space-y-3"
+        variants={{ hidden: {}, show: { transition: { staggerChildren: 0.05 } } }}
+        className="space-y-3"
       >
-        {stories.map((story) => (
-          <motion.div
-            key={story.id}
-            variants={{
-              hidden: { opacity: 0, y: 10 },
-              show: { opacity: 1, y: 0 },
-            }}
-          >
-            <StoryCard
-              story={story}
+        {stories.map((story) => {
+          const topicIcon = TOPIC_ICONS[story.topics[0] ?? ''] ?? 'auto_stories'
+          return (
+            <motion.button
+              key={story.id}
+              variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}
               onClick={() => router.push(`/stories/${story.id}`)}
-            />
-          </motion.div>
-        ))}
+              className="glass-card flex w-full items-center gap-4 rounded-[1rem] p-4 text-left transition-all duration-300 hover:bg-surface-container-high/40 active:scale-[0.98]"
+            >
+              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                <Icon name={topicIcon} size={26} className="text-primary" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="truncate font-display text-base font-medium text-on-surface">
+                  {story.title}
+                </h3>
+                <div className="mt-0.5 flex items-center gap-1 font-body text-xs text-on-surface-variant">
+                  <span className="capitalize">{story.topics[0]}</span>
+                  <span>·</span>
+                  <Icon name="schedule" size={12} />
+                  <span>{formatDuration(story.durationSeconds)} read</span>
+                </div>
+              </div>
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary/10">
+                <Icon name="play_arrow" size={22} className="text-primary" />
+              </div>
+            </motion.button>
+          )
+        })}
       </motion.div>
     </div>
   )

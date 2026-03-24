@@ -5,10 +5,10 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/cn'
 import { Icon } from './icon'
 
+/** 3 tabs matching the Stitch mock nav exactly */
 const TABS = [
   { href: '/discover', label: 'Home', icon: 'auto_stories' },
-  { href: '/stories', label: 'Explore', icon: 'explore' },
-  { href: '/favorites', label: 'Favorites', icon: 'star' },
+  { href: '/favorites', label: 'Favorites', icon: 'favorite' },
   { href: '/history', label: 'History', icon: 'history' },
 ]
 
