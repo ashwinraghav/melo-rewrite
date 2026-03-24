@@ -117,7 +117,7 @@ export default function FavoritesPage() {
                 <Icon name="favorite" size={22} filled />
               </button>
               <button
-                onClick={() => router.push(`/stories/${fav.storyId}`)}
+                onClick={() => router.push(`/player?id=${fav.storyId}`)}
                 className="flex items-center gap-1 rounded-full bg-primary px-4 py-2 font-body text-xs font-medium text-on-primary"
               >
                 <Icon name="play_circle" size={16} />

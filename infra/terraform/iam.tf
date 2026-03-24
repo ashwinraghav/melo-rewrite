@@ -50,14 +50,6 @@ resource "google_cloud_run_v2_service_iam_member" "api_public" {
   member   = "allUsers"
 }
 
-resource "google_cloud_run_v2_service_iam_member" "web_public" {
-  project  = var.project_id
-  location = var.region
-  name     = google_cloud_run_v2_service.web.name
-  role     = "roles/run.invoker"
-  member   = "allUsers"
-}
-
 # ── Cloud Build service account permissions ────────────────────────────────────
 
 # Allow Cloud Build to push images to Artifact Registry and deploy to Cloud Run.

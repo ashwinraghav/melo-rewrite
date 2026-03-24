@@ -51,7 +51,7 @@ export function createApiClient(getToken: GetTokenFn) {
     const res = await fetch(`${baseUrl}${path}`, {
       method,
       headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     })
 
     if (res.status === 204) return undefined as T

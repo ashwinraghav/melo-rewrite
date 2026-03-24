@@ -24,12 +24,6 @@ variable "api_image" {
   default     = "us-docker.pkg.dev/cloudrun/container/hello"  # placeholder until first real build
 }
 
-variable "web_image" {
-  description = "Full Artifact Registry image URI for the web service"
-  type        = string
-  default     = "us-docker.pkg.dev/cloudrun/container/hello"  # placeholder until first real build
-}
-
 variable "audio_url_ttl_seconds" {
   description = "Signed URL TTL for story audio files (seconds)"
   type        = number
@@ -39,6 +33,6 @@ variable "audio_url_ttl_seconds" {
 variable "cors_origins" {
   description = "Comma-separated CORS origins allowed for the API"
   type        = string
-  # Updated after first web deployment — set to the Cloud Run web service URL
-  default     = "https://mello-web-placeholder.run.app"
+  # Firebase Hosting default + custom domains (comma-separated)
+  default     = "https://melo-f5756.web.app,https://melobooks.com,https://www.melobooks.com"
 }

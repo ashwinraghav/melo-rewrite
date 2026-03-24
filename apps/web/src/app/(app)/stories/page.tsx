@@ -110,7 +110,7 @@ export default function StoriesPage() {
             <span>{formatDuration(featured.durationSeconds)} read</span>
           </div>
           <button
-            onClick={() => router.push(`/stories/${featured.id}`)}
+            onClick={() => router.push(`/player?id=${featured.id}`)}
             className="mt-4 flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 font-body text-sm font-medium text-on-primary transition-all duration-300 hover:brightness-110 active:scale-[0.98]"
           >
             <Icon name="play_circle" size={18} />
@@ -149,7 +149,7 @@ export default function StoriesPage() {
             <motion.button
               key={story.id}
               variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}
-              onClick={() => router.push(`/stories/${story.id}`)}
+              onClick={() => router.push(`/player?id=${story.id}`)}
               className="glass-card flex w-full items-center gap-4 rounded-[1rem] p-4 text-left transition-all duration-300 hover:bg-surface-container-high/40 active:scale-[0.98]"
             >
               <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10">

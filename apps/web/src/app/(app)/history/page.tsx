@@ -67,7 +67,7 @@ export default function HistoryPage() {
           >
             <button
               className="glass-card flex w-full items-center gap-4 rounded-[1rem] p-4 text-left transition-all duration-300 hover:bg-surface-container-high/40 active:scale-[0.98]"
-              onClick={() => router.push(`/stories/${entry.storyId}`)}
+              onClick={() => router.push(`/player?id=${entry.storyId}`)}
             >
               <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10">
                 <Icon name="auto_stories" size={24} className="text-primary" />

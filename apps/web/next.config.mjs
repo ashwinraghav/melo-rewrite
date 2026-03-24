@@ -1,20 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Output standalone bundle for Docker / Cloud Run
-  output: 'standalone',
+  // Static export for Firebase Hosting CDN
+  output: 'export',
 
-  // Allow images served from GCS signed URLs
+  // next/image optimization isn't available in static export
   images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'storage.googleapis.com',
-      },
-      {
-        protocol: 'https',
-        hostname: '*.googleapis.com',
-      },
-    ],
+    unoptimized: true,
   },
 
   // Expose API URL to the client (non-secret)

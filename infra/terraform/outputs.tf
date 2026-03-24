@@ -6,8 +6,8 @@ output "api_url" {
 }
 
 output "web_url" {
-  description = "Public URL of the mello-web Cloud Run service"
-  value       = google_cloud_run_v2_service.web.uri
+  description = "Firebase Hosting URL for the web frontend"
+  value       = "https://${var.project_id}.web.app"
 }
 
 output "stories_bucket" {

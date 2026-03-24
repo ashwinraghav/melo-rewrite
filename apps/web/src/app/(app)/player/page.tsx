@@ -1,28 +1,30 @@
 'use client'
 
 /**
- * Story player page.
- *
- * Corresponds to "Reading Story (Dark)" in the Stitch mocks.
- * Loads the story, renders the AudioPlayer, and records progress
- * back to the API at regular intervals and on completion.
+ * Story player page — /player?id=xxx
+ * Loads the story, renders the AudioPlayer, records progress.
  */
 
-import { use } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useQuery, useMutation } from '@tanstack/react-query'
+import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { useApiClient } from '@/hooks/useApiClient'
 import { AudioPlayer } from '@/components/audio-player'
+import { Icon } from '@/components/icon'
 import type { StoryWithAudioUrl } from '@mello/types'
 import { COMPLETION_THRESHOLD } from '@mello/types'
 
-export default function StoryPlayerPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params)
+export default function PlayerPage() {
+  const searchParams = useSearchParams()
+  const id = searchParams.get('id') ?? ''
+  const router = useRouter()
   const client = useApiClient()
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['story', id],
     queryFn: () => client.get<StoryWithAudioUrl>(`/v1/stories/${id}`),
+    enabled: !!id,
   })
 
   const story = data?.data
@@ -48,10 +50,15 @@ export default function StoryPlayerPage({ params }: { params: Promise<{ id: stri
 
   if (isError || !story) {
     return (
-      <div className="flex min-h-dvh items-center justify-center px-6">
-        <p className="text-center text-sm text-on-surface-variant">
-          Story not found.
-        </p>
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 px-6">
+        <Icon name="error_outline" size={48} className="text-on-surface-variant/40" />
+        <p className="text-sm text-on-surface-variant">Story not found.</p>
+        <button
+          onClick={() => router.back()}
+          className="rounded-full bg-primary px-5 py-2.5 font-body text-sm font-medium text-on-primary"
+        >
+          Go back
+        </button>
       </div>
     )
   }
@@ -62,14 +69,24 @@ export default function StoryPlayerPage({ params }: { params: Promise<{ id: stri
       animate={{ opacity: 1 }}
       className="flex min-h-dvh flex-col"
     >
-      {/* Cover art — fills the upper portion of the screen */}
+      {/* Back button */}
+      <div className="absolute left-4 top-4 z-10">
+        <button
+          onClick={() => router.back()}
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-surface/60 backdrop-blur-sm"
+          aria-label="Back"
+        >
+          <Icon name="arrow_back" size={20} className="text-on-surface" />
+        </button>
+      </div>
+
+      {/* Cover art */}
       <div className="relative flex-1">
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={{ backgroundImage: `url(${story.coverArtUrl})` }}
           aria-hidden
         />
-        {/* Gradient overlay so text is legible */}
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/40 to-background" />
 
         {/* Story info */}
@@ -78,7 +95,7 @@ export default function StoryPlayerPage({ params }: { params: Promise<{ id: stri
             {story.topics.map((topic) => (
               <span
                 key={topic}
-                className="rounded-full bg-primary-container/80 px-3 py-1 font-body text-xs text-primary backdrop-blur-sm"
+                className="rounded-full bg-primary/15 px-3 py-1 font-body text-xs text-primary backdrop-blur-sm"
               >
                 {topic}
               </span>
