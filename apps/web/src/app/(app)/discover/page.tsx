@@ -69,7 +69,7 @@ export default function DiscoverPage() {
             }}
             onClick={() => router.push(`/stories/length?topics=${topic.id}`)}
             className="glass-card flex flex-col items-start gap-3 rounded-[1rem] p-5 text-left transition-all duration-300 hover:bg-surface-container-high/40 active:scale-[0.97]"
-            style={i % 2 === 1 ? { transform: 'translateY(1.5rem)' } : undefined}
+            style={i % 2 === 1 ? { transform: 'translateY(1.5rem)' } : {}}
           >
             <Icon name={topic.icon} size={28} className="text-primary" />
             <div>
