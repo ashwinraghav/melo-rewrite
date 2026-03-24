@@ -33,6 +33,9 @@ tfplan
 !vitest.config*.json
 !**/fixtures/**/*.json
 
+# Story generation output (audio files + manifest)
+scripts/stories-output/
+
 # Logs
 *.log
 npm-debug.log*

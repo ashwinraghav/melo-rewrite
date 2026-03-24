@@ -69,6 +69,10 @@ export interface StoryWithAudioUrl {
   /** Pre-signed URL valid for 15 minutes. */
   audioUrl: string
   coverArtUrl: string
+  /** Full story text (detail endpoint only). */
+  storyText?: string
+  /** Timed segments for read-along (detail endpoint only). */
+  segments?: import('./story.js').StorySegment[]
   isPublished: boolean
   createdAt: string
   updatedAt: string

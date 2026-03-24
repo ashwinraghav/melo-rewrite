@@ -15,6 +15,9 @@ const TABS = [
 export function BottomNav() {
   const pathname = usePathname()
 
+  // Hide on the player page — it's a full-screen experience
+  if (pathname.startsWith('/player')) return null
+
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around bg-surface-container-highest/60 backdrop-blur-[12px] pb-safe pt-2"

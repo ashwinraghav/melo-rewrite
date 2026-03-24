@@ -9,7 +9,7 @@ from ..models.story import StoryFilters, StoryWithAudioUrl, Story, categorize_du
 def make_router(repos: Repositories) -> APIRouter:
     router = APIRouter(prefix="/v1")
 
-    def resolve_story_urls(story: Story) -> StoryWithAudioUrl:
+    def resolve_story_urls(story: Story, include_text: bool = False) -> StoryWithAudioUrl:
         return StoryWithAudioUrl(
             id=story.id,
             title=story.title,
@@ -21,6 +21,8 @@ def make_router(repos: Repositories) -> APIRouter:
             topics=story.topics,
             audio_url=repos.stories.get_audio_signed_url(story.id, story.audio_path),
             cover_art_url=repos.stories.get_cover_art_signed_url(story.id, story.cover_art_path),
+            story_text=story.story_text if include_text else None,
+            segments=story.segments if include_text else None,
             is_published=story.is_published,
             created_at=story.created_at,
             updated_at=story.updated_at,
@@ -50,6 +52,6 @@ def make_router(repos: Repositories) -> APIRouter:
         story = repos.stories.find_by_id(story_id)
         if story is None:
             raise HTTPException(status_code=404, detail="Story not found")
-        return {"data": resolve_story_urls(story).model_dump(by_alias=True)}
+        return {"data": resolve_story_urls(story, include_text=True).model_dump(by_alias=True)}
 
     return router

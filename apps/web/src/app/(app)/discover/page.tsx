@@ -67,7 +67,7 @@ export default function DiscoverPage() {
               hidden: { opacity: 0, y: 16 },
               show: { opacity: 1, y: 0 },
             }}
-            onClick={() => router.push(`/stories/length?topics=${topic.id}`)}
+            onClick={() => router.push(`/stories?topics=${topic.id}`)}
             className="glass-card flex flex-col items-start gap-3 rounded-[1rem] p-5 text-left transition-all duration-300 hover:bg-surface-container-high/40 active:scale-[0.97]"
             style={i % 2 === 1 ? { transform: 'translateY(1.5rem)' } : {}}
           >

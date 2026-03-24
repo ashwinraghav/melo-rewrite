@@ -65,9 +65,23 @@ export interface Story {
    */
   coverArtPath: string
   /** Only published stories are surfaced to users. */
+  /** Full story text for read-along display. */
+  storyText: string
+  /** Timed segments for read-along highlighting. */
+  segments: StorySegment[]
   isPublished: boolean
   createdAt: string // ISO 8601
   updatedAt: string // ISO 8601
+}
+
+/** A timed text segment for read-along highlighting. */
+export interface StorySegment {
+  /** The sentence or phrase to display. */
+  text: string
+  /** Start time in seconds within the audio. */
+  startTime: number
+  /** End time in seconds within the audio. */
+  endTime: number
 }
 
 /** Filters accepted by the story list endpoint. All fields optional. */

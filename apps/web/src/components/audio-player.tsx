@@ -1,8 +1,8 @@
 'use client'
 
 /**
- * AudioPlayer — glassmorphic audio controls.
- * Matches Stitch "Reading Story (Dark)" player: replay_10, play_arrow, forward_10.
+ * AudioPlayer — glassmorphic audio controls with speed control.
+ * Handles audio source changes seamlessly (no remount needed).
  */
 
 import { useRef, useState, useEffect, useCallback } from 'react'
@@ -11,18 +11,50 @@ import { Icon } from './icon'
 interface AudioPlayerProps {
   audioUrl: string
   durationSeconds: number
+  autoPlay?: boolean
   onProgress?: (progressSeconds: number) => void
+  onTimeUpdate?: (currentTime: number) => void
+  onPlayingChange?: (isPlaying: boolean) => void
+  onEnded?: () => void
 }
 
 const PROGRESS_REPORT_INTERVAL_S = 10
+const SPEEDS: number[] = [0.75, 1, 1.25]
 
-export function AudioPlayer({ audioUrl, durationSeconds, onProgress }: AudioPlayerProps) {
+export function AudioPlayer({
+  audioUrl,
+  durationSeconds,
+  autoPlay = false,
+  onProgress,
+  onTimeUpdate,
+  onPlayingChange,
+  onEnded,
+}: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null)
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const prevUrlRef = useRef(audioUrl)
 
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [isReady, setIsReady] = useState(false)
+  const [speedIndex, setSpeedIndex] = useState(1) // default 1x
+
+  const speed = SPEEDS[speedIndex] ?? 1
+
+  // Handle audio source changes seamlessly
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio || audioUrl === prevUrlRef.current) return
+    prevUrlRef.current = audioUrl
+
+    // Reset state for new track
+    setCurrentTime(0)
+    setIsReady(false)
+    onTimeUpdate?.(0)
+
+    // Load new source — canplay handler will trigger autoplay
+    audio.load()
+  }, [audioUrl])
 
   const togglePlay = useCallback(async () => {
     const audio = audioRef.current
@@ -34,6 +66,14 @@ export function AudioPlayer({ audioUrl, durationSeconds, onProgress }: AudioPlay
     }
   }, [isPlaying])
 
+  const cycleSpeed = useCallback(() => {
+    const next = (speedIndex + 1) % SPEEDS.length
+    setSpeedIndex(next)
+    if (audioRef.current) {
+      audioRef.current.playbackRate = SPEEDS[next]!
+    }
+  }, [speedIndex])
+
   const handleScrub = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTime = parseFloat(e.target.value)
     if (audioRef.current) audioRef.current.currentTime = newTime
@@ -44,29 +84,54 @@ export function AudioPlayer({ audioUrl, durationSeconds, onProgress }: AudioPlay
     const audio = audioRef.current
     if (!audio) return
 
-    const onPlay = () => setIsPlaying(true)
-    const onPause = () => setIsPlaying(false)
-    const onTimeUpdate = () => setCurrentTime(audio.currentTime)
-    const onCanPlay = () => setIsReady(true)
-    const onEnded = () => {
+    const onPlay = () => {
+      setIsPlaying(true)
+      onPlayingChange?.(true)
+    }
+    const onPause = () => {
       setIsPlaying(false)
+      onPlayingChange?.(false)
+    }
+    const onTime = () => {
+      const t = audio.currentTime
+      setCurrentTime(t)
+      onTimeUpdate?.(t)
+    }
+    const onCanPlay = () => {
+      setIsReady(true)
+      // Auto-play on ready (both initial load and track changes)
+      if (autoPlay) {
+        audio.play().catch(() => {})
+      }
+    }
+    const onEndedEvt = () => {
+      setIsPlaying(false)
+      onPlayingChange?.(false)
       onProgress?.(durationSeconds)
+      onEnded?.()
     }
 
     audio.addEventListener('play', onPlay)
     audio.addEventListener('pause', onPause)
-    audio.addEventListener('timeupdate', onTimeUpdate)
+    audio.addEventListener('timeupdate', onTime)
     audio.addEventListener('canplay', onCanPlay)
-    audio.addEventListener('ended', onEnded)
+    audio.addEventListener('ended', onEndedEvt)
 
     return () => {
       audio.removeEventListener('play', onPlay)
       audio.removeEventListener('pause', onPause)
-      audio.removeEventListener('timeupdate', onTimeUpdate)
+      audio.removeEventListener('timeupdate', onTime)
       audio.removeEventListener('canplay', onCanPlay)
-      audio.removeEventListener('ended', onEnded)
+      audio.removeEventListener('ended', onEndedEvt)
     }
-  }, [durationSeconds, onProgress])
+  }, [durationSeconds, autoPlay, onProgress, onTimeUpdate, onPlayingChange, onEnded])
+
+  // Set playback rate when speed changes
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.playbackRate = speed
+    }
+  }, [speed])
 
   useEffect(() => {
     if (isPlaying) {
@@ -95,10 +160,17 @@ export function AudioPlayer({ audioUrl, durationSeconds, onProgress }: AudioPlay
     <div className="w-full" role="region" aria-label="Audio player">
       <audio ref={audioRef} src={audioUrl} preload="metadata" />
 
-      {/* Narrator label */}
-      <div className="mb-4 flex items-center justify-center gap-2">
+      {/* Narrator label + speed control */}
+      <div className="mb-4 flex items-center justify-center gap-3">
         <Icon name="record_voice_over" size={16} className="text-on-surface-variant" />
         <span className="font-body text-xs text-on-surface-variant">Gentle Voice</span>
+        <button
+          onClick={cycleSpeed}
+          className="ml-2 rounded-full bg-surface-container-high/60 px-2.5 py-1 font-body text-xs font-medium text-on-surface-variant transition-all hover:bg-surface-container-highest/60 active:scale-95"
+          aria-label={`Playback speed: ${speed}x`}
+        >
+          {speed}x
+        </button>
       </div>
 
       {/* Progress bar */}
@@ -130,7 +202,7 @@ export function AudioPlayer({ audioUrl, durationSeconds, onProgress }: AudioPlay
         <span>{formatTime(durationSeconds)}</span>
       </div>
 
-      {/* Controls — Material Symbols per Stitch spec */}
+      {/* Controls */}
       <div className="flex items-center justify-center gap-8">
         <button
           onClick={() => {

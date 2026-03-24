@@ -9,7 +9,7 @@ import google.auth
 from google.auth.transport.requests import Request as GoogleAuthRequest
 from google.cloud import storage as gcs
 from google.oauth2.service_account import Credentials as SACredentials
-from ..models.story import Story, StoryFilters, categorize_duration
+from ..models.story import Story, StoryFilters, StorySegment, categorize_duration
 from ..models.user import UserProfile
 from ..models.listening import Favorite, HistoryEntry
 from .interfaces import StoryRepository, UserRepository, FavoriteRepository, HistoryRepository, Repositories
@@ -23,6 +23,11 @@ def _now() -> str:
 
 
 def _story_from_doc(doc_id: str, data: dict) -> Story:
+    raw_segments = data.get("segments", [])
+    segments = [
+        StorySegment(text=s["text"], start_time=s["startTime"], end_time=s["endTime"])
+        for s in raw_segments
+    ]
     return Story(
         id=doc_id,
         title=data["title"],
@@ -34,6 +39,8 @@ def _story_from_doc(doc_id: str, data: dict) -> Story:
         topics=data.get("topics", []),
         audio_path=data["audioPath"],
         cover_art_path=data["coverArtPath"],
+        story_text=data.get("storyText", ""),
+        segments=segments,
         is_published=data.get("isPublished", False),
         created_at=data.get("createdAt", _now()),
         updated_at=data.get("updatedAt", _now()),

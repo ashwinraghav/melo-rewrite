@@ -20,6 +20,12 @@ class CamelModel(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
+class StorySegment(CamelModel):
+    text: str
+    start_time: float
+    end_time: float
+
+
 class Story(CamelModel):
     id: str
     title: str
@@ -31,6 +37,8 @@ class Story(CamelModel):
     topics: list[str]
     audio_path: str
     cover_art_path: str
+    story_text: str = ""
+    segments: list[StorySegment] = []
     is_published: bool
     created_at: str
     updated_at: str
@@ -47,6 +55,8 @@ class StoryWithAudioUrl(CamelModel):
     topics: list[str]
     audio_url: str
     cover_art_url: str
+    story_text: str | None = None
+    segments: list[StorySegment] | None = None
     is_published: bool
     created_at: str
     updated_at: str

@@ -13,13 +13,16 @@
  */
 
 import { useEffect, type ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useAuthContext } from '@/context/auth-context'
 import { BottomNav } from '@/components/bottom-nav'
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const { user, loading } = useAuthContext()
   const router = useRouter()
+  const pathname = usePathname()
+
+  const isPlayer = pathname.startsWith('/player')
 
   useEffect(() => {
     if (!loading && !user) router.replace('/sign-in')
@@ -29,7 +32,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <main className="flex-1 pb-20">{children}</main>
+      <main className={`flex-1 ${isPlayer ? '' : 'pb-20'}`}>{children}</main>
       <BottomNav />
     </div>
   )
