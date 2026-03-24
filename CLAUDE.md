@@ -87,8 +87,13 @@ From the Stitch project "Editorial Serenity" (project ID 13037681786636023062).
 
 ## Infrastructure
 
-Cloud Run (not GKE). One container per service. No Kubernetes.
-All infra is in `infra/terraform/`. Never deploy with `gcloud run deploy` — always use `terraform apply`.
+**ALL infrastructure changes MUST go through Terraform.** No exceptions.
+
+- Cloud Run (not GKE). One container per service. No Kubernetes.
+- All infra is in `infra/terraform/`.
+- **NEVER** use `gcloud run deploy`, `gcloud storage buckets create`, `gcloud iam`, or any imperative GCP CLI commands to create/modify infrastructure. Always use `terraform apply`.
+- **NEVER** create GCP resources (buckets, service accounts, IAM bindings, Cloud Run services, etc.) outside of Terraform. If a resource is needed, add it to the `.tf` files first.
+- The only exception is the one-time tfstate bucket creation (documented in `docs/deploy.md`).
 
 **GCP project:** `melo-f5756` (project number `888632552624`)
 **Region:** `us-central1`
