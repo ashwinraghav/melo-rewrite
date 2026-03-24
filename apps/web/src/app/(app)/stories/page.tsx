@@ -63,16 +63,28 @@ export default function StoriesPage() {
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <div className="mb-4 flex items-center gap-3">
           <button
-            onClick={() => router.push('/discover')}
+            onClick={() => router.back()}
             className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-high/40"
             aria-label="Back"
           >
             <Icon name="arrow_back" size={20} className="text-on-surface" />
           </button>
           <h1 className="font-display text-2xl font-bold tracking-tight text-on-surface">
-            Tonight&apos;s Stories
+            Celestial Slumber
           </h1>
+          <div className="ml-auto">
+            <Icon name="search" size={22} className="text-on-surface-variant" />
+          </div>
         </div>
+
+        {/* Section heading — "Midnight Library" per mock */}
+        <div className="mb-4 flex items-center gap-2">
+          <Icon name="nights_stay" size={20} className="text-secondary" />
+          <h2 className="font-display text-lg font-semibold text-on-surface">Midnight Library</h2>
+        </div>
+        <p className="mb-5 font-body text-sm text-on-surface-variant">
+          Soft whispers and gentle melodies for a peaceful journey to dreamland.
+        </p>
 
         {/* Duration filter chips */}
         <DurationFilter selected={duration} onChange={setDuration} />

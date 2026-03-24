@@ -11,6 +11,7 @@
 
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
+import { useAuthContext } from '@/context/auth-context'
 import { Icon } from '@/components/icon'
 
 const TOPICS = [
@@ -23,6 +24,7 @@ const TOPICS = [
 
 export default function DiscoverPage() {
   const router = useRouter()
+  const { signOut } = useAuthContext()
 
   return (
     <div className="px-6 py-8 pb-28">
@@ -37,6 +39,13 @@ export default function DiscoverPage() {
           <h1 className="font-display text-2xl font-bold tracking-tight text-on-surface">
             Celestial Slumber
           </h1>
+          <button
+            onClick={signOut}
+            className="ml-auto flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-high/40 transition-all hover:bg-surface-container-highest/60"
+            aria-label="Sign out"
+          >
+            <Icon name="logout" size={20} className="text-on-surface-variant" />
+          </button>
         </div>
 
         <h2 className="font-display text-xl font-semibold text-on-surface">
@@ -64,7 +73,7 @@ export default function DiscoverPage() {
               hidden: { opacity: 0, y: 12 },
               show: { opacity: 1, y: 0 },
             }}
-            onClick={() => router.push(`/stories?topics=${topic.id}`)}
+            onClick={() => router.push(`/stories/length?topics=${topic.id}`)}
             className="glass-card flex w-full items-center gap-4 rounded-[1rem] p-5 text-left transition-all duration-300 hover:bg-surface-container-high/40 active:scale-[0.98]"
           >
             <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10">
