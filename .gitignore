@@ -9,8 +9,16 @@ __pycache__/
 # Build outputs
 dist/
 .next/
+out/
 .turbo/
 *.tsbuildinfo
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+tfplan
+*.tfplan
 
 # Environment
 .env
