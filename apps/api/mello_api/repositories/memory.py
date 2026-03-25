@@ -64,6 +64,9 @@ class MemoryStoryRepository(StoryRepository):
     def get_cover_art_signed_url(self, story_id: str, cover_art_path: str) -> str:
         return f"https://storage.example.com/{cover_art_path}?signed=1"
 
+    def get_cover_art_public_url(self, cover_art_path: str) -> str:
+        return f"https://storage.googleapis.com/test-bucket/{cover_art_path}"
+
 
 class MemoryUserRepository(UserRepository):
     def __init__(self) -> None:

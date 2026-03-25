@@ -45,6 +45,17 @@ resource "google_service_account_iam_member" "api_token_creator" {
   member             = "serviceAccount:${google_service_account.api.email}"
 }
 
+# ── Public read access to story assets ────────────────────────────────────────
+#
+# Cover art and audio for published stories are served directly via public GCS
+# URLs, avoiding per-request signed URL generation. This eliminates server-side
+# signing latency and lets browsers cache images with standard HTTP caching.
+resource "google_storage_bucket_iam_member" "stories_public_read" {
+  bucket = google_storage_bucket.stories.name
+  role   = "roles/storage.objectViewer"
+  member = "allUsers"
+}
+
 # ── Cloud Run invoker (public access) ─────────────────────────────────────────
 
 # Both services are publicly accessible — users hit them directly from the browser.

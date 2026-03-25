@@ -36,6 +36,9 @@ class StoryRepository(ABC):
     @abstractmethod
     def get_cover_art_signed_url(self, story_id: str, cover_art_path: str) -> str: ...
 
+    @abstractmethod
+    def get_cover_art_public_url(self, cover_art_path: str) -> str: ...
+
 
 class UserRepository(ABC):
     @abstractmethod

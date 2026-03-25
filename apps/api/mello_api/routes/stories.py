@@ -20,7 +20,7 @@ def make_router(repos: Repositories) -> APIRouter:
             age_max=story.age_max,
             topics=story.topics,
             audio_url=repos.stories.get_audio_signed_url(story.id, story.audio_path),
-            cover_art_url=repos.stories.get_cover_art_signed_url(story.id, story.cover_art_path),
+            cover_art_url=repos.stories.get_cover_art_public_url(story.cover_art_path),
             story_text=story.story_text if include_text else None,
             segments=story.segments if include_text else None,
             is_published=story.is_published,
