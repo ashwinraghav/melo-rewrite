@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
 StoryDuration = Literal["short", "medium", "long"]
+StorySource = Literal["curated", "user"]
 
 DURATION_THRESHOLDS = {"short_max": 299, "medium_max": 899}
 
@@ -41,6 +42,7 @@ class Story(CamelModel):
     segments: list[StorySegment] = []
     themes: str = ""
     embedding: list[float] = []
+    source: StorySource = "curated"
     is_published: bool
     created_at: str
     updated_at: str
@@ -59,6 +61,7 @@ class StoryWithAudioUrl(CamelModel):
     cover_art_url: str
     story_text: str | None = None
     segments: list[StorySegment] | None = None
+    source: StorySource = "curated"
     is_published: bool
     created_at: str
     updated_at: str

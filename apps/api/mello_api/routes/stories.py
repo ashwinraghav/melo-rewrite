@@ -23,6 +23,7 @@ def make_router(repos: Repositories) -> APIRouter:
             cover_art_url=repos.stories.get_cover_art_public_url(story.cover_art_path),
             story_text=story.story_text if include_text else None,
             segments=story.segments if include_text else None,
+            source=story.source,
             is_published=story.is_published,
             created_at=story.created_at,
             updated_at=story.updated_at,

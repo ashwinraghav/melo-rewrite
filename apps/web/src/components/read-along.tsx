@@ -30,14 +30,20 @@ export function ReadAlong({ segments, currentTime, isPlaying }: ReadAlongProps) 
     (s) => currentTime >= s.startTime && currentTime < s.endTime
   )
 
-  // Auto-scroll to keep active sentence visible
+  // Auto-scroll within the container only — never move the page
   useEffect(() => {
-    if (activeRef.current && containerRef.current) {
-      activeRef.current.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
-      })
-    }
+    const el = activeRef.current
+    const container = containerRef.current
+    if (!el || !container) return
+
+    // Use getBoundingClientRect so inline spans inside <p> are measured correctly
+    const elRect = el.getBoundingClientRect()
+    const containerRect = container.getBoundingClientRect()
+
+    // How far the element is from the container's visible top, plus current scroll
+    const elTopInContainer = elRect.top - containerRect.top + container.scrollTop
+    const target = elTopInContainer - container.clientHeight / 2 + elRect.height / 2
+    container.scrollTo({ top: target, behavior: 'smooth' })
   }, [activeIndex])
 
   if (segments.length === 0) return null

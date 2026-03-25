@@ -170,9 +170,16 @@ function SearchPage() {
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-display text-sm font-semibold text-on-surface">
-                      {story.title}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="truncate font-display text-sm font-semibold text-on-surface">
+                        {story.title}
+                      </p>
+                      {story.source === 'user' && (
+                        <span className="flex-shrink-0 rounded-full bg-tertiary/15 px-2 py-0.5 font-body text-[10px] font-medium text-tertiary">
+                          yours
+                        </span>
+                      )}
+                    </div>
                     <p className="mt-0.5 line-clamp-2 font-body text-xs leading-relaxed text-on-surface-variant">
                       {story.description}
                     </p>

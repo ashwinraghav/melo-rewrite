@@ -38,6 +38,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
             topics=story.topics,
             audio_url=audio_url,
             cover_art_url=cover_art_url,
+            source=story.source,
             is_published=story.is_published,
             created_at=story.created_at,
             updated_at=story.updated_at,

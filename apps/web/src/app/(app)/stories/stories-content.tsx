@@ -175,9 +175,16 @@ export function StoriesContent() {
 
             {/* Info */}
             <div className="min-w-0 flex-1">
-              <h3 className="truncate font-display text-[0.95rem] font-medium text-on-surface">
-                {story.title}
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="truncate font-display text-[0.95rem] font-medium text-on-surface">
+                  {story.title}
+                </h3>
+                {story.source === 'user' && (
+                  <span className="flex-shrink-0 rounded-full bg-tertiary/15 px-2 py-0.5 font-body text-[10px] font-medium text-tertiary">
+                    yours
+                  </span>
+                )}
+              </div>
               <p className="mt-0.5 truncate font-body text-xs text-on-surface-variant">
                 {story.description}
               </p>

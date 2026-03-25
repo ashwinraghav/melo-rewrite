@@ -35,7 +35,7 @@ describe('AudioPlayer', () => {
 
   it('renders a Play button initially', () => {
     render(<AudioPlayer {...DEFAULT_PROPS} />)
-    expect(screen.getByRole('button', { name: /play/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^play$/i })).toBeInTheDocument()
   })
 
   it('renders rewind and forward buttons', () => {
@@ -60,7 +60,7 @@ describe('AudioPlayer', () => {
 
   it('play button is disabled when audio is not ready', () => {
     render(<AudioPlayer {...DEFAULT_PROPS} />)
-    expect(screen.getByRole('button', { name: /play/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /^play$/i })).toBeDisabled()
   })
 
   it('calls onProgress when the ended event fires', () => {

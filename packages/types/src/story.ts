@@ -13,6 +13,9 @@
 /** Bucketed duration shown in the UI picker. Derived from durationSeconds. */
 export type StoryDuration = 'short' | 'medium' | 'long'
 
+/** Where the story originated. */
+export type StorySource = 'curated' | 'user'
+
 /**
  * Duration thresholds (seconds). Keep in one place so UI and API stay in sync.
  *
@@ -69,6 +72,8 @@ export interface Story {
   storyText: string
   /** Timed segments for read-along highlighting. */
   segments: StorySegment[]
+  /** Where the story originated — admin upload or user-generated via creator flow. */
+  source: StorySource
   isPublished: boolean
   createdAt: string // ISO 8601
   updatedAt: string // ISO 8601
