@@ -17,8 +17,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
   onAuthStateChanged,
-  signInWithPopup,
-  GoogleAuthProvider,
   signOut as firebaseSignOut,
   type User,
 } from 'firebase/auth'
@@ -50,8 +48,12 @@ export function useAuth(): AuthState {
   }, [user])
 
   const signInWithGoogle = useCallback(async (): Promise<void> => {
+    // Lazy-load popup resolver + provider — only needed on the sign-in page,
+    // not on every page that mounts the AuthProvider.
+    const { signInWithPopup, GoogleAuthProvider, browserPopupRedirectResolver } =
+      await import('firebase/auth')
     const provider = new GoogleAuthProvider()
-    await signInWithPopup(auth, provider)
+    await signInWithPopup(auth, provider, browserPopupRedirectResolver)
   }, [])
 
   const signOut = useCallback(async (): Promise<void> => {

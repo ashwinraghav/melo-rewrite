@@ -13,7 +13,13 @@
  */
 
 import { initializeApp, getApps } from 'firebase/app'
-import { getAuth, connectAuthEmulator } from 'firebase/auth'
+import {
+  initializeAuth,
+  indexedDBLocalPersistence,
+  browserLocalPersistence,
+  connectAuthEmulator,
+  type Auth,
+} from 'firebase/auth'
 
 const firebaseConfig = {
   apiKey: process.env['NEXT_PUBLIC_FIREBASE_API_KEY'] ?? '',
@@ -27,7 +33,22 @@ const firebaseConfig = {
 // Initialise once — Next.js hot-reload can call this module multiple times.
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]!
 
-export const auth = getAuth(app)
+// Use initializeAuth instead of getAuth to avoid loading the popup/redirect
+// resolver eagerly. This prevents Firebase from opening a preemptive iframe
+// on every page load — only the sign-in page passes the resolver explicitly.
+// See: https://firebase.google.com/docs/auth/web/custom-dependencies
+let auth: Auth
+try {
+  auth = initializeAuth(app, {
+    persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+  })
+} catch {
+  // initializeAuth throws if called twice (e.g. Next.js HMR). Fall back to
+  // the already-initialised instance via getAuth.
+  const { getAuth } = require('firebase/auth') as typeof import('firebase/auth')
+  auth = getAuth(app)
+}
+export { auth }
 
 // Connect to the Auth emulator in development so tests and local dev don't
 // touch the production Firebase project.
