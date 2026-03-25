@@ -8,7 +8,7 @@
  * - Navigates to /stories?topics=X&duration=Y
  */
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Icon } from '@/components/icon'
@@ -19,7 +19,11 @@ const DURATIONS = [
   { value: 'long', icon: 'schedule', label: '10 Minutes', subtitle: 'Deep Slumber' },
 ]
 
-export default function PickLengthPage() {
+export default function PickLengthPageWrapper() {
+  return <Suspense><PickLengthPage /></Suspense>
+}
+
+function PickLengthPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const topics = searchParams.get('topics') ?? ''

@@ -8,7 +8,7 @@
  * so the transition is seamless — no page reload, no loading spinner.
  */
 
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { Suspense, useState, useCallback, useMemo, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -19,7 +19,11 @@ import { Icon } from '@/components/icon'
 import type { StoryWithAudioUrl, PaginatedResponse } from '@mello/types'
 import { COMPLETION_THRESHOLD } from '@mello/types'
 
-export default function PlayerPage() {
+export default function PlayerPageWrapper() {
+  return <Suspense><PlayerPage /></Suspense>
+}
+
+function PlayerPage() {
   const searchParams = useSearchParams()
   const initialId = searchParams.get('id') ?? ''
   const topics = searchParams.get('topics') ?? ''

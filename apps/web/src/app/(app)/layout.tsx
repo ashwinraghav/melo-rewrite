@@ -8,11 +8,12 @@
  *   2. Renders the bottom navigation bar
  *   3. Provides padding-bottom so content clears the nav bar
  *
- * The audio player bar is rendered inside this layout so it persists across
- * page navigations without re-mounting.
+ * The page shell renders immediately (before auth resolves) so the browser
+ * can paint the layout, header, and skeleton placeholders as the LCP element
+ * instead of waiting for auth → API → images.
  */
 
-import { useEffect, type ReactNode } from 'react'
+import { Suspense, useEffect, type ReactNode } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useAuthContext } from '@/context/auth-context'
 import { BottomNav } from '@/components/bottom-nav'
@@ -28,12 +29,12 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     if (!loading && !user) router.replace('/sign-in')
   }, [user, loading, router])
 
-  if (loading || !user) return null
-
   return (
     <div className="flex min-h-dvh flex-col">
-      <main className={`flex-1 ${isPlayer ? '' : 'pb-20'}`}>{children}</main>
-      <BottomNav />
+      <main className={`flex-1 ${isPlayer ? '' : 'pb-20'}`}>
+        {children}
+      </main>
+      {!loading && user && <BottomNav />}
     </div>
   )
 }
