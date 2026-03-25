@@ -48,23 +48,34 @@ export function createApiClient(getToken: GetTokenFn) {
     }
     if (token) headers['Authorization'] = `Bearer ${token}`
 
-    const res = await fetch(`${baseUrl}${path}`, {
-      method,
-      headers,
-      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-    })
+    let res: Response
+    try {
+      res = await fetch(`${baseUrl}${path}`, {
+        method,
+        headers,
+        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      })
+    } catch {
+      throw new ApiClientError('NETWORK_ERROR', 'Network request failed', 0)
+    }
 
     if (res.status === 204) return undefined as T
 
-    const json = await res.json()
+    let json: unknown
+    try {
+      json = await res.json()
+    } catch {
+      throw new ApiClientError('PARSE_ERROR', `Server returned ${res.status}`, res.status)
+    }
 
     if (!res.ok) {
-      const err = json as ApiError
-      throw new ApiClientError(
-        err.error.code,
-        err.error.message,
-        res.status,
-      )
+      const err = json as ApiError | { detail?: string }
+      const code = ('error' in err && err.error?.code) || 'UNKNOWN_ERROR'
+      const message =
+        ('error' in err && err.error?.message) ||
+        ('detail' in err && typeof err.detail === 'string' && err.detail) ||
+        `Request failed (${res.status})`
+      throw new ApiClientError(code, message, res.status)
     }
 
     return json as T
