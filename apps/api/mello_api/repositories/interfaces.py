@@ -39,6 +39,9 @@ class StoryRepository(ABC):
     @abstractmethod
     def get_cover_art_public_url(self, cover_art_path: str) -> str: ...
 
+    @abstractmethod
+    def get_audio_public_url(self, audio_path: str) -> str: ...
+
 
 class UserRepository(ABC):
     @abstractmethod

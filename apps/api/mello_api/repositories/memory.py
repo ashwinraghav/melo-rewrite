@@ -67,6 +67,9 @@ class MemoryStoryRepository(StoryRepository):
     def get_cover_art_public_url(self, cover_art_path: str) -> str:
         return f"https://storage.googleapis.com/test-bucket/{cover_art_path}"
 
+    def get_audio_public_url(self, audio_path: str) -> str:
+        return f"https://storage.googleapis.com/test-bucket/{audio_path}"
+
 
 class MemoryUserRepository(UserRepository):
     def __init__(self) -> None:
