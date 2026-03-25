@@ -52,6 +52,15 @@ class FirestoreStoryRepository(StoryRepository):
         self._db = db
         self._bucket_name = bucket_name
         self._url_ttl_seconds = url_ttl_seconds
+        # Reuse a single GCS client + credentials across all signed-URL calls
+        # instead of creating new ones per call (avoids repeated metadata-server round-trips).
+        self._gcs_client = gcs.Client()
+        credentials, _ = google.auth.default()
+        self._credentials = credentials
+        self._sa_email: str | None = None
+        if not isinstance(credentials, SACredentials):
+            credentials.refresh(GoogleAuthRequest())
+            self._sa_email = credentials.service_account_email
 
     def find_by_id(self, story_id: str) -> Story | None:
         doc = self._db.collection("stories").document(story_id).get()
@@ -115,10 +124,19 @@ class FirestoreStoryRepository(StoryRepository):
 
     def find_many(self, filters: StoryFilters) -> list[Story]:
         query = self._db.collection("stories").where("isPublished", "==", True)
+
+        # Use Firestore array-contains for single-topic filtering (most common case).
+        # Firestore only supports one array-contains per query, so multiple topics
+        # still fall back to in-memory filtering.
+        topics_handled = False
+        if filters.topics and len(filters.topics) == 1:
+            query = query.where("topics", "array_contains", filters.topics[0])
+            topics_handled = True
+
         docs = query.stream()
         stories = [_story_from_doc(d.id, d.to_dict()) for d in docs]
 
-        if filters.topics:
+        if filters.topics and not topics_handled:
             stories = [s for s in stories if any(t in s.topics for t in filters.topics)]
         if filters.child_age is not None:
             stories = [s for s in stories if s.age_min <= filters.child_age <= s.age_max]
@@ -128,23 +146,22 @@ class FirestoreStoryRepository(StoryRepository):
         return stories
 
     def _signed_url(self, path: str) -> str:
-        credentials, _ = google.auth.default()
-        client = gcs.Client(credentials=credentials)
-        blob = client.bucket(self._bucket_name).blob(path)
+        blob = self._gcs_client.bucket(self._bucket_name).blob(path)
         expiration = timedelta(seconds=self._url_ttl_seconds)
 
-        if isinstance(credentials, SACredentials):
+        if isinstance(self._credentials, SACredentials):
             # Local dev with service account JSON
             return blob.generate_signed_url(version="v4", expiration=expiration, method="GET")
         else:
-            # Cloud Run — use ADC token + service account email
-            credentials.refresh(GoogleAuthRequest())
+            # Cloud Run — refresh token only when expired
+            if not self._credentials.token or not self._credentials.valid:
+                self._credentials.refresh(GoogleAuthRequest())
             return blob.generate_signed_url(
                 version="v4",
                 expiration=expiration,
                 method="GET",
-                service_account_email=credentials.service_account_email,
-                access_token=credentials.token,
+                service_account_email=self._sa_email,
+                access_token=self._credentials.token,
             )
 
     def get_audio_signed_url(self, story_id: str, audio_path: str) -> str:
