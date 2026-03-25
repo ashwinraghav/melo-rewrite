@@ -6,6 +6,8 @@ from mello_api.repositories.memory import create_memory_repositories, MemoryStor
 from mello_api.services.story_generator import MockStoryGenerator
 from mello_api.services.audio_publisher import MockAudioPublisher
 from mello_api.services.cover_generator import MockCoverGenerator
+from mello_api.services.embedding import MockEmbeddingService
+from mello_api.services.search import SearchService
 from tests.fixtures import STORIES
 
 
@@ -19,10 +21,13 @@ def repos():
 
 @pytest.fixture
 def services():
+    embedding = MockEmbeddingService()
     return Services(
         story_generator=MockStoryGenerator(),
         audio_publisher=MockAudioPublisher(),
         cover_generator=MockCoverGenerator(),
+        embedding=embedding,
+        search=SearchService(embedding_service=embedding),
     )
 
 

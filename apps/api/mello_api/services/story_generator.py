@@ -18,6 +18,7 @@ class GeneratedStory:
     description: str
     story_text: str
     topics: list[str]
+    themes: str
     age_min: int
     age_max: int
 
@@ -43,6 +44,7 @@ Respond with ONLY a JSON object (no markdown, no code fences) with these fields:
   "description": "One sentence summary (under 100 characters)",
   "storyText": "The full story text, written as continuous prose with proper sentences.",
   "topics": ["one or two topic tags, e.g. park, friends, bedtime, food, animals, nature"],
+  "themes": "An elaborate paragraph describing the deeper themes, lessons, emotions, and real-life situations this story addresses. Write as if explaining to a parent what their child will learn. Include specific scenarios like 'sibling jealousy', 'first day of school anxiety', 'learning to share with a new baby'. Be thorough — this text powers semantic search so parents can find stories by describing their child's situation.",
   "ageMin": 1,
   "ageMax": 6
 }
@@ -72,6 +74,7 @@ class ClaudeStoryGenerator(StoryGeneratorService):
             description=data["description"],
             story_text=data["storyText"],
             topics=data["topics"],
+            themes=data.get("themes", ""),
             age_min=data.get("ageMin", 1),
             age_max=data.get("ageMax", 6),
         )
@@ -91,6 +94,11 @@ class MockStoryGenerator(StoryGeneratorService):
                 "By morning, new blossoms had opened their petals to the sun."
             ),
             topics=["nature"],
+            themes=(
+                "This story explores patience and the beauty of gentle persistence. "
+                "It teaches children that small actions can lead to wonderful outcomes, "
+                "and that nature works quietly and slowly to create beautiful things."
+            ),
             age_min=1,
             age_max=6,
         )

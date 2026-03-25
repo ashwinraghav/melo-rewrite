@@ -62,3 +62,9 @@ variable "elevenlabs_model_id" {
   type        = string
   default     = "eleven_multilingual_v2"
 }
+
+variable "cohere_api_key" {
+  description = "Cohere API key for semantic search reranking"
+  type        = string
+  sensitive   = true
+}

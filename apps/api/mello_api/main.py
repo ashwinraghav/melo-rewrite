@@ -9,6 +9,7 @@ from .routes.health import router as health_router
 from .routes.stories import make_router as make_stories_router
 from .routes.me import make_router as make_me_router
 from .routes.creator import make_router as make_creator_router
+from .routes.search import make_router as make_search_router
 
 
 def create_app(
@@ -31,5 +32,6 @@ def create_app(
     app.include_router(make_me_router(repos))
     if services:
         app.include_router(make_creator_router(repos, services))
+        app.include_router(make_search_router(repos, services))
 
     return app

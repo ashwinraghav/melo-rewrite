@@ -5,9 +5,9 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/cn'
 import { Icon } from './icon'
 
-/** 4 tabs — Create visible to all users for now */
 const TABS = [
   { href: '/discover', label: 'Home', icon: 'auto_stories' },
+  { href: '/search', label: 'Search', icon: 'search' },
   { href: '/create', label: 'Create', icon: 'edit_note' },
   { href: '/favorites', label: 'Favorites', icon: 'favorite' },
   { href: '/history', label: 'History', icon: 'history' },

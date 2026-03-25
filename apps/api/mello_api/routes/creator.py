@@ -80,6 +80,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
             cover_art_path="",
             story_text=generated.story_text,
             segments=[],
+            themes=generated.themes,
             is_published=False,
             created_at=now,
             updated_at=now,
@@ -152,14 +153,21 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
             story_id, story.title, story.description, story.topics
         )
 
+        # Generate embedding for semantic search
+        embedding = services.embedding.embed_story(story)
+
         repos.stories.update(story_id, {
             "audio_path": audio_result.audio_path,
             "cover_art_path": cover_path,
             "duration_seconds": audio_result.duration_seconds,
             "duration_category": categorize_duration(audio_result.duration_seconds),
             "segments": audio_result.segments,
+            "embedding": embedding,
             "is_published": True,
         })
+
+        # Invalidate search cache so the new story appears
+        services.search.invalidate()
 
         updated = repos.stories.find_by_id(story_id)
         return {"data": _resolve_story_urls(updated).model_dump(by_alias=True)}

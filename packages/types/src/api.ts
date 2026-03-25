@@ -76,6 +76,17 @@ export interface UpdateDraftBody {
   ageMax?: number
 }
 
+export interface SearchStoriesBody {
+  query: string
+  childAge?: number
+  limit?: number
+}
+
+export interface SearchResult extends StoryWithAudioUrl {
+  /** Cosine similarity / rerank relevance score (0-1). Higher = more relevant. */
+  score: number
+}
+
 // ---------------------------------------------------------------------------
 // Response types (composed from domain types)
 // ---------------------------------------------------------------------------

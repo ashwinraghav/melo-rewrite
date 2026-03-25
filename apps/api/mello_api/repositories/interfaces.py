@@ -10,6 +10,8 @@ if TYPE_CHECKING:
     from ..services.story_generator import StoryGeneratorService
     from ..services.audio_publisher import AudioPublisherService
     from ..services.cover_generator import CoverGeneratorService
+    from ..services.embedding import EmbeddingService
+    from ..services.search import SearchService
 
 
 class StoryRepository(ABC):
@@ -89,3 +91,5 @@ class Services:
     story_generator: StoryGeneratorService
     audio_publisher: AudioPublisherService
     cover_generator: CoverGeneratorService
+    embedding: EmbeddingService
+    search: SearchService

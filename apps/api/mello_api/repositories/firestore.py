@@ -41,6 +41,8 @@ def _story_from_doc(doc_id: str, data: dict) -> Story:
         cover_art_path=data["coverArtPath"],
         story_text=data.get("storyText", ""),
         segments=segments,
+        themes=data.get("themes", ""),
+        embedding=data.get("embedding", []),
         is_published=data.get("isPublished", False),
         created_at=data.get("createdAt", _now()),
         updated_at=data.get("updatedAt", _now()),
@@ -91,6 +93,8 @@ class FirestoreStoryRepository(StoryRepository):
                 {"text": s.text, "startTime": s.start_time, "endTime": s.end_time}
                 for s in story.segments
             ],
+            "themes": story.themes,
+            "embedding": story.embedding,
             "isPublished": story.is_published,
             "createdAt": story.created_at,
             "updatedAt": story.updated_at,

@@ -10,6 +10,8 @@ from .repositories.interfaces import Services
 from .services.story_generator import ClaudeStoryGenerator
 from .services.audio_publisher import ElevenLabsPublisher
 from .services.cover_generator import VertexCoverGenerator
+from .services.embedding import VertexEmbeddingService
+from .services.search import SearchService
 
 firebase_admin.initialize_app(options={"projectId": config.gcp_project_id})
 
@@ -34,6 +36,17 @@ if config.anthropic_api_key and config.elevenlabs_api_key:
             gcp_project_id=config.gcp_project_id,
             gcp_location="us-central1",
             bucket_name=config.storage_bucket,
+        ),
+        embedding=VertexEmbeddingService(
+            gcp_project_id=config.gcp_project_id,
+            gcp_location="us-central1",
+        ),
+        search=SearchService(
+            embedding_service=VertexEmbeddingService(
+                gcp_project_id=config.gcp_project_id,
+                gcp_location="us-central1",
+            ),
+            cohere_api_key=config.cohere_api_key,
         ),
     )
 

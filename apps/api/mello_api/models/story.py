@@ -39,6 +39,8 @@ class Story(CamelModel):
     cover_art_path: str
     story_text: str = ""
     segments: list[StorySegment] = []
+    themes: str = ""
+    embedding: list[float] = []
     is_published: bool
     created_at: str
     updated_at: str
@@ -90,3 +92,9 @@ class UpdateDraftRequest(CamelModel):
     topics: list[str] | None = None
     age_min: int | None = None
     age_max: int | None = None
+
+
+class SearchStoriesRequest(CamelModel):
+    query: str
+    child_age: int | None = None
+    limit: int = 10
