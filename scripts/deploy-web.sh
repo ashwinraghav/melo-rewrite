@@ -7,6 +7,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 API_URL="${NEXT_PUBLIC_API_URL:-https://mello-api-rhp2tqs5qa-uc.a.run.app}"
+AUTH_DOMAIN="${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:-melostories.com}"
 
 echo "── Deploy Web ─────────────────────────────────────────"
 
@@ -20,9 +21,9 @@ fi
 echo "→ Building types..."
 pnpm --filter @mello/types build
 
-# Build static export with production API URL
-echo "→ Building static export (API_URL=$API_URL)..."
-NEXT_PUBLIC_API_URL="$API_URL" pnpm --filter @mello/web build
+# Build static export with production API URL and same-origin authDomain
+echo "→ Building static export (API_URL=$API_URL, AUTH_DOMAIN=$AUTH_DOMAIN)..."
+NEXT_PUBLIC_API_URL="$API_URL" NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="$AUTH_DOMAIN" pnpm --filter @mello/web build
 
 # Deploy
 echo "→ Deploying to Firebase Hosting..."
