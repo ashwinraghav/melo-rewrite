@@ -60,6 +60,59 @@ class FirestoreStoryRepository(StoryRepository):
         story = _story_from_doc(doc.id, doc.to_dict())
         return story if story.is_published else None
 
+    def find_by_id_any(self, story_id: str) -> Story | None:
+        doc = self._db.collection("stories").document(story_id).get()
+        if not doc.exists:
+            return None
+        return _story_from_doc(doc.id, doc.to_dict())
+
+    def create(self, story: Story) -> Story:
+        doc_data = {
+            "title": story.title,
+            "description": story.description,
+            "durationSeconds": story.duration_seconds,
+            "durationCategory": story.duration_category,
+            "ageMin": story.age_min,
+            "ageMax": story.age_max,
+            "topics": story.topics,
+            "audioPath": story.audio_path,
+            "coverArtPath": story.cover_art_path,
+            "storyText": story.story_text,
+            "segments": [
+                {"text": s.text, "startTime": s.start_time, "endTime": s.end_time}
+                for s in story.segments
+            ],
+            "isPublished": story.is_published,
+            "createdAt": story.created_at,
+            "updatedAt": story.updated_at,
+        }
+        self._db.collection("stories").document(story.id).set(doc_data)
+        return story
+
+    def update(self, story_id: str, data: dict) -> Story | None:
+        field_map = {
+            "duration_seconds": "durationSeconds",
+            "duration_category": "durationCategory",
+            "age_min": "ageMin",
+            "age_max": "ageMax",
+            "audio_path": "audioPath",
+            "cover_art_path": "coverArtPath",
+            "story_text": "storyText",
+            "is_published": "isPublished",
+        }
+        firestore_data: dict = {}
+        for k, v in data.items():
+            if k == "segments":
+                firestore_data["segments"] = [
+                    {"text": s["text"], "startTime": s["startTime"], "endTime": s["endTime"]}
+                    for s in v
+                ]
+            else:
+                firestore_data[field_map.get(k, k)] = v
+        firestore_data["updatedAt"] = _now()
+        self._db.collection("stories").document(story_id).update(firestore_data)
+        return self.find_by_id_any(story_id)
+
     def find_many(self, filters: StoryFilters) -> list[Story]:
         query = self._db.collection("stories").where("isPublished", "==", True)
         docs = query.stream()
@@ -119,6 +172,7 @@ class FirestoreUserRepository(UserRepository):
             display_name=data.get("displayName"),
             child_age=data.get("childAge"),
             preferred_topics=data.get("preferredTopics", []),
+            is_creator=data.get("isCreator", False),
             created_at=data.get("createdAt", _now()),
             updated_at=data.get("updatedAt", _now()),
         )
@@ -129,6 +183,7 @@ class FirestoreUserRepository(UserRepository):
             "displayName": profile.display_name,
             "childAge": profile.child_age,
             "preferredTopics": profile.preferred_topics,
+            "isCreator": profile.is_creator,
             "createdAt": profile.created_at,
             "updatedAt": profile.updated_at,
         }

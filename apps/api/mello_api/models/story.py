@@ -66,3 +66,27 @@ class StoryFilters(BaseModel):
     topics: list[str] | None = None
     child_age: int | None = None
     duration: StoryDuration | None = None
+
+
+class GenerateStoryRequest(CamelModel):
+    prompt: str
+
+
+class GenerateStoryResponse(CamelModel):
+    id: str
+    title: str
+    description: str
+    story_text: str
+    topics: list[str]
+    age_min: int
+    age_max: int
+    created_at: str
+
+
+class UpdateDraftRequest(CamelModel):
+    title: str | None = None
+    description: str | None = None
+    story_text: str | None = None
+    topics: list[str] | None = None
+    age_min: int | None = None
+    age_max: int | None = None

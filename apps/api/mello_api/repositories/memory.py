@@ -28,6 +28,22 @@ class MemoryStoryRepository(StoryRepository):
             return None
         return story
 
+    def find_by_id_any(self, story_id: str) -> Story | None:
+        return self._stories.get(story_id)
+
+    def create(self, story: Story) -> Story:
+        self._stories[story.id] = story
+        return story
+
+    def update(self, story_id: str, data: dict) -> Story | None:
+        story = self._stories.get(story_id)
+        if story is None:
+            return None
+        updated = story.model_copy(update=data)
+        updated = updated.model_copy(update={"updated_at": _now()})
+        self._stories[story_id] = updated
+        return updated
+
     def find_many(self, filters: StoryFilters) -> list[Story]:
         results = [s for s in self._stories.values() if s.is_published]
 

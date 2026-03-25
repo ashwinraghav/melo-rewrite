@@ -13,6 +13,7 @@ class UserProfile(CamelModel):
     display_name: str | None
     child_age: int | None
     preferred_topics: list[str]
+    is_creator: bool = False
     created_at: str
     updated_at: str
 

@@ -6,6 +6,10 @@ import firebase_admin
 from .config import config
 from .main import create_app
 from .repositories.firestore import create_firestore_repositories
+from .repositories.interfaces import Services
+from .services.story_generator import ClaudeStoryGenerator
+from .services.audio_publisher import ElevenLabsPublisher
+from .services.cover_generator import VertexCoverGenerator
 
 firebase_admin.initialize_app(options={"projectId": config.gcp_project_id})
 
@@ -15,4 +19,22 @@ repos = create_firestore_repositories(
     url_ttl_seconds=config.audio_url_ttl_seconds,
 )
 
-app = create_app(repos=repos, cors_origins=config.cors_origins)
+services: Services | None = None
+if config.anthropic_api_key and config.elevenlabs_api_key:
+    services = Services(
+        story_generator=ClaudeStoryGenerator(api_key=config.anthropic_api_key),
+        audio_publisher=ElevenLabsPublisher(
+            api_key=config.elevenlabs_api_key,
+            voice_id=config.elevenlabs_voice_id,
+            model_id=config.elevenlabs_model_id,
+            bucket_name=config.storage_bucket,
+            gcp_project_id=config.gcp_project_id,
+        ),
+        cover_generator=VertexCoverGenerator(
+            gcp_project_id=config.gcp_project_id,
+            gcp_location="us-central1",
+            bucket_name=config.storage_bucket,
+        ),
+    )
+
+app = create_app(repos=repos, services=services, cors_origins=config.cors_origins)

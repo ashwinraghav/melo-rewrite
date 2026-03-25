@@ -52,6 +52,30 @@ export interface RecordProgressBody {
   completed: boolean
 }
 
+export interface GenerateStoryBody {
+  prompt: string
+}
+
+export interface GeneratedStoryDraft {
+  id: string
+  title: string
+  description: string
+  storyText: string
+  topics: string[]
+  ageMin: number
+  ageMax: number
+  createdAt: string
+}
+
+export interface UpdateDraftBody {
+  title?: string
+  description?: string
+  storyText?: string
+  topics?: string[]
+  ageMin?: number
+  ageMax?: number
+}
+
 // ---------------------------------------------------------------------------
 // Response types (composed from domain types)
 // ---------------------------------------------------------------------------

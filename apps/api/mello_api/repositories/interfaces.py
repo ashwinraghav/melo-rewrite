@@ -1,9 +1,15 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 from ..models.story import Story, StoryFilters
 from ..models.user import UserProfile
 from ..models.listening import Favorite, HistoryEntry
+
+if TYPE_CHECKING:
+    from ..services.story_generator import StoryGeneratorService
+    from ..services.audio_publisher import AudioPublisherService
+    from ..services.cover_generator import CoverGeneratorService
 
 
 class StoryRepository(ABC):
@@ -11,7 +17,18 @@ class StoryRepository(ABC):
     def find_by_id(self, story_id: str) -> Story | None: ...
 
     @abstractmethod
+    def find_by_id_any(self, story_id: str) -> Story | None:
+        """Find by ID regardless of publish state. Used by creator endpoints."""
+        ...
+
+    @abstractmethod
     def find_many(self, filters: StoryFilters) -> list[Story]: ...
+
+    @abstractmethod
+    def create(self, story: Story) -> Story: ...
+
+    @abstractmethod
+    def update(self, story_id: str, data: dict) -> Story | None: ...
 
     @abstractmethod
     def get_audio_signed_url(self, story_id: str, audio_path: str) -> str: ...
@@ -59,3 +76,10 @@ class Repositories:
     users: UserRepository
     favorites: FavoriteRepository
     history: HistoryRepository
+
+
+@dataclass
+class Services:
+    story_generator: StoryGeneratorService
+    audio_publisher: AudioPublisherService
+    cover_generator: CoverGeneratorService

@@ -54,6 +54,34 @@ resource "google_cloud_run_v2_service" "api" {
         name  = "AUDIO_URL_TTL_SECONDS"
         value = tostring(var.audio_url_ttl_seconds)
       }
+
+      # Creator service secrets (from Secret Manager)
+      env {
+        name = "ANTHROPIC_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.anthropic_api_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+      env {
+        name = "ELEVENLABS_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.elevenlabs_api_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+      env {
+        name  = "ELEVENLABS_VOICE_ID"
+        value = var.elevenlabs_voice_id
+      }
+      env {
+        name  = "ELEVENLABS_MODEL_ID"
+        value = var.elevenlabs_model_id
+      }
       # PORT is set automatically by Cloud Run — do not set it manually
 
       ports {
@@ -84,5 +112,9 @@ resource "google_cloud_run_v2_service" "api" {
   depends_on = [
     google_project_service.apis,
     google_service_account.api,
+    google_secret_manager_secret_version.anthropic_api_key,
+    google_secret_manager_secret_version.elevenlabs_api_key,
+    google_secret_manager_secret_iam_member.api_anthropic,
+    google_secret_manager_secret_iam_member.api_elevenlabs,
   ]
 }

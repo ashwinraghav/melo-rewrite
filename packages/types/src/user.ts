@@ -30,6 +30,8 @@ export interface UserProfile {
    * Empty array = no filter applied (show everything).
    */
   preferredTopics: string[]
+  /** Whether this user can create and publish stories. */
+  isCreator: boolean
   createdAt: string // ISO 8601
   updatedAt: string // ISO 8601
 }

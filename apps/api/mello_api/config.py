@@ -15,5 +15,11 @@ class Config:
     port: int = int(os.environ.get("PORT", "8080"))
     env: str = os.environ.get("ENV", "development")
 
+    # Creator services
+    anthropic_api_key: str = os.environ.get("ANTHROPIC_API_KEY", "")
+    elevenlabs_api_key: str = os.environ.get("ELEVENLABS_API_KEY", "")
+    elevenlabs_voice_id: str = os.environ.get("ELEVENLABS_VOICE_ID", "AXdMgz6evoL7OPd7eU12")
+    elevenlabs_model_id: str = os.environ.get("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")
+
 
 config = Config()

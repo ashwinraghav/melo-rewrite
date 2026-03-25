@@ -15,7 +15,8 @@ locals {
     "firebase.googleapis.com",         # Firebase platform
     "identitytoolkit.googleapis.com",  # Firebase Auth
     "storage.googleapis.com",          # Cloud Storage
-    "secretmanager.googleapis.com",    # Secret Manager (future use)
+    "secretmanager.googleapis.com",    # Secret Manager
+    "aiplatform.googleapis.com",       # Vertex AI (Imagen cover art)
     "iam.googleapis.com",              # IAM
     "cloudresourcemanager.googleapis.com",
     "dns.googleapis.com",              # Cloud DNS (custom domain)

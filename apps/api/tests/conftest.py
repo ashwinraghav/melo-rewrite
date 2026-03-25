@@ -1,7 +1,11 @@
 import pytest
 from fastapi.testclient import TestClient
 from mello_api.main import create_app
+from mello_api.repositories.interfaces import Services
 from mello_api.repositories.memory import create_memory_repositories, MemoryStoryRepository
+from mello_api.services.story_generator import MockStoryGenerator
+from mello_api.services.audio_publisher import MockAudioPublisher
+from mello_api.services.cover_generator import MockCoverGenerator
 from tests.fixtures import STORIES
 
 
@@ -14,8 +18,24 @@ def repos():
 
 
 @pytest.fixture
+def services():
+    return Services(
+        story_generator=MockStoryGenerator(),
+        audio_publisher=MockAudioPublisher(),
+        cover_generator=MockCoverGenerator(),
+    )
+
+
+@pytest.fixture
 def client(repos):
     app = create_app(repos=repos)
+    return TestClient(app)
+
+
+@pytest.fixture
+def creator_client(repos, services):
+    """Client with creator services enabled."""
+    app = create_app(repos=repos, services=services)
     return TestClient(app)
 
 

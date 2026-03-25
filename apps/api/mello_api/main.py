@@ -4,13 +4,18 @@ App factory. Import `create_app` in tests; use `asgi.py` as the uvicorn entry po
 from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .repositories.interfaces import Repositories
+from .repositories.interfaces import Repositories, Services
 from .routes.health import router as health_router
 from .routes.stories import make_router as make_stories_router
 from .routes.me import make_router as make_me_router
+from .routes.creator import make_router as make_creator_router
 
 
-def create_app(repos: Repositories, cors_origins: list[str] | None = None) -> FastAPI:
+def create_app(
+    repos: Repositories,
+    services: Services | None = None,
+    cors_origins: list[str] | None = None,
+) -> FastAPI:
     app = FastAPI(title="Mello API", version="0.0.1", docs_url=None, redoc_url=None)
 
     app.add_middleware(
@@ -24,5 +29,7 @@ def create_app(repos: Repositories, cors_origins: list[str] | None = None) -> Fa
     app.include_router(health_router)
     app.include_router(make_stories_router(repos))
     app.include_router(make_me_router(repos))
+    if services:
+        app.include_router(make_creator_router(repos, services))
 
     return app

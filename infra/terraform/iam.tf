@@ -21,11 +21,19 @@ resource "google_project_iam_member" "api_firestore" {
 
 # ── Cloud Storage access ───────────────────────────────────────────────────────
 
-# The API reads story audio + artwork from the stories bucket.
-resource "google_storage_bucket_iam_member" "api_storage_viewer" {
+# The API reads, uploads, and overwrites story audio + artwork in the stories bucket.
+# objectAdmin covers read + create + delete (needed for overwriting on retry).
+resource "google_storage_bucket_iam_member" "api_storage_admin" {
   bucket = google_storage_bucket.stories.name
-  role   = "roles/storage.objectViewer"
+  role   = "roles/storage.objectAdmin"
   member = "serviceAccount:${google_service_account.api.email}"
+}
+
+# The API calls Vertex AI Imagen for cover art generation (creator flow).
+resource "google_project_iam_member" "api_vertex_ai" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.api.email}"
 }
 
 # The API signs URLs on behalf of itself using its own service account credentials.

@@ -36,3 +36,29 @@ variable "cors_origins" {
   # Firebase Hosting default + custom domains (comma-separated)
   default     = "https://melo-f5756.web.app,https://melobooks.com,https://www.melobooks.com,https://melostories.com,https://www.melostories.com"
 }
+
+# ── Creator service secrets ──────────────────────────────────────────────────
+
+variable "anthropic_api_key" {
+  description = "Anthropic API key for Claude story generation"
+  type        = string
+  sensitive   = true
+}
+
+variable "elevenlabs_api_key" {
+  description = "ElevenLabs API key for TTS audio generation"
+  type        = string
+  sensitive   = true
+}
+
+variable "elevenlabs_voice_id" {
+  description = "ElevenLabs voice ID for story narration"
+  type        = string
+  default     = "AXdMgz6evoL7OPd7eU12"
+}
+
+variable "elevenlabs_model_id" {
+  description = "ElevenLabs model ID for TTS"
+  type        = string
+  default     = "eleven_multilingual_v2"
+}

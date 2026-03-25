@@ -13,3 +13,9 @@ region         = "us-central1"
 # cors_origins = "https://melo-f5756.web.app,https://melobooks.com,https://www.melobooks.com"
 
 # audio_url_ttl_seconds = 900  # 15 minutes (default)
+
+# Creator service API keys (required for story generation)
+# anthropic_api_key  = "sk-ant-..."
+# elevenlabs_api_key = "sk_..."
+# elevenlabs_voice_id = "AXdMgz6evoL7OPd7eU12"  # default
+# elevenlabs_model_id = "eleven_multilingual_v2"  # default
