@@ -2,7 +2,7 @@
  * Search page tests.
  *
  * Tests the semantic search UI: input, results rendering, empty/no-results
- * states, navigation, and the "yours" badge for user-generated stories.
+ * states, navigation, and the "Shar" badge for user-generated stories.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -178,17 +178,17 @@ describe('SearchPage', () => {
     })
   })
 
-  it('shows "yours" badge for user-generated stories', async () => {
+  it('shows "Shar" badge for user-generated stories', async () => {
     mockSearchParams = new URLSearchParams('q=bedtime')
     mockPost.mockResolvedValueOnce(MOCK_RESULTS)
 
     renderWithQuery(<SearchPageWrapper />)
 
     await waitFor(() => {
-      expect(screen.getByText('yours')).toBeInTheDocument()
+      expect(screen.getByText('Shar')).toBeInTheDocument()
     })
-    // Only one "yours" badge (story-2 has source='user', story-1 has source='curated')
-    expect(screen.getAllByText('yours')).toHaveLength(1)
+    // Only one "Shar" badge (story-2 has source='user', story-1 has source='curated')
+    expect(screen.getAllByText('Shar')).toHaveLength(1)
   })
 
   it('shows cover art image when URL is present', async () => {

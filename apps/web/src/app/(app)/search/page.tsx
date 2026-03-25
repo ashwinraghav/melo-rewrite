@@ -176,7 +176,7 @@ function SearchPage() {
                       </p>
                       {story.source === 'user' && (
                         <span className="flex-shrink-0 rounded-full bg-tertiary/15 px-2 py-0.5 font-body text-[10px] font-medium text-tertiary">
-                          yours
+                          Shar
                         </span>
                       )}
                     </div>
