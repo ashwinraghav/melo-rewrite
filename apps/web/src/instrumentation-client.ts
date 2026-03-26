@@ -29,7 +29,6 @@ Sentry.init({
 
   integrations: [Sentry.replayIntegration()],
 
-  // Suppress Sentry console output in production.
   debug: process.env.NODE_ENV === 'development',
 })
 

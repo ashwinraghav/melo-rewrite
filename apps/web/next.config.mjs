@@ -35,8 +35,4 @@ export default withSentryConfig(nextConfig, {
     deleteSourcemapsAfterUpload: true,
   },
 
-  // Tree-shake Sentry debug logging in production.
-  bundleSizeOptimizations: {
-    excludeDebugStatements: true,
-  },
 })
