@@ -15,8 +15,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useApiClient } from '@/hooks/useApiClient'
 import { AudioPlayer } from '@/components/audio-player'
 import { ReadAlong } from '@/components/read-along'
+import { VoiceSwitcher } from '@/components/voice-switcher'
 import { Icon } from '@/components/icon'
-import type { StoryWithAudioUrl, PaginatedResponse } from '@mello/types'
+import type { StoryWithAudioUrl, PaginatedResponse, StorySegment } from '@mello/types'
 import { COMPLETION_THRESHOLD } from '@mello/types'
 
 function PlayerSkeleton() {
@@ -63,6 +64,20 @@ function PlayerPage() {
   const [currentId, setCurrentId] = useState(initialId)
   const [currentTime, setCurrentTime] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
+
+  // Voice switcher state
+  const [activeVoiceId, setActiveVoiceId] = useState<string | null>(null)
+  const [overrideAudioUrl, setOverrideAudioUrl] = useState<string | null>(null)
+  const [overrideSegments, setOverrideSegments] = useState<StorySegment[] | null>(null)
+
+  const handleVoiceChange = useCallback(
+    (voiceId: string | null, audioUrl: string, segments: StorySegment[]) => {
+      setActiveVoiceId(voiceId)
+      setOverrideAudioUrl(voiceId ? audioUrl : null)
+      setOverrideSegments(voiceId ? segments : null)
+    },
+    [],
+  )
 
   // Fetch current story detail (with text + segments)
   const { data, isLoading, isError } = useQuery({
@@ -133,6 +148,10 @@ function PlayerPage() {
   const switchTrack = useCallback((storyId: string) => {
     setCurrentTime(0)
     setCurrentId(storyId)
+    // Reset voice override on track change
+    setActiveVoiceId(null)
+    setOverrideAudioUrl(null)
+    setOverrideSegments(null)
   }, [])
 
   const handleEnded = useCallback(() => {
@@ -165,7 +184,8 @@ function PlayerPage() {
     )
   }
 
-  const segments = story.segments ?? []
+  const segments = overrideSegments ?? story.segments ?? []
+  const audioUrl = overrideAudioUrl ?? story.audioUrl
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -224,6 +244,17 @@ function PlayerPage() {
             {story.title}
           </h1>
           <p className="mt-1 text-sm text-on-surface-variant">{story.description}</p>
+
+          {/* Voice switcher */}
+          <div className="mt-3">
+            <VoiceSwitcher
+              storyId={currentId}
+              originalAudioUrl={story.audioUrl}
+              originalSegments={story.segments ?? []}
+              activeVoiceId={activeVoiceId}
+              onVoiceChange={handleVoiceChange}
+            />
+          </div>
         </motion.div>
       </AnimatePresence>
 
@@ -275,7 +306,7 @@ function PlayerPage() {
       {/* Audio player — stays mounted, handles src changes internally */}
       <div className="player-bar px-6 pb-8 pt-4">
         <AudioPlayer
-          audioUrl={story.audioUrl}
+          audioUrl={audioUrl}
           durationSeconds={story.durationSeconds}
           autoPlay
           onProgress={handleProgress}
