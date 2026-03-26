@@ -323,35 +323,28 @@ class FirestoreVoiceRepository(VoiceRepository):
     def _col(self, uid: str):
         return self._db.collection("users").document(uid).collection("voices")
 
+    @staticmethod
+    def _voice_from_doc(doc_id: str, d: dict) -> Voice:
+        # Support both camelCase (new) and snake_case (legacy July 2025) field names
+        return Voice(
+            id=doc_id,
+            name=d.get("name", ""),
+            relationship=d.get("relationship", ""),
+            eleven_labs_voice_id=d.get("elevenLabsVoiceId") or d.get("elevenlabs_voice_id", ""),
+            status=d.get("status", "processing"),
+            sample_audio_path=d.get("sampleAudioPath") or d.get("sample_audio_path", ""),
+            created_at=d.get("createdAt") or str(d.get("created_at", _now())),
+        )
+
     def find_by_id(self, uid: str, voice_id: str) -> Voice | None:
         doc = self._ref(uid, voice_id).get()
         if not doc.exists:
             return None
-        d = doc.to_dict()
-        return Voice(
-            id=doc.id,
-            name=d.get("name", ""),
-            relationship=d.get("relationship", ""),
-            eleven_labs_voice_id=d.get("elevenLabsVoiceId", ""),
-            status=d.get("status", "processing"),
-            sample_audio_path=d.get("sampleAudioPath", ""),
-            created_at=d.get("createdAt", _now()),
-        )
+        return self._voice_from_doc(doc.id, doc.to_dict())
 
     def find_all(self, uid: str) -> list[Voice]:
         docs = self._col(uid).stream()
-        return [
-            Voice(
-                id=d.id,
-                name=d.to_dict().get("name", ""),
-                relationship=d.to_dict().get("relationship", ""),
-                eleven_labs_voice_id=d.to_dict().get("elevenLabsVoiceId", ""),
-                status=d.to_dict().get("status", "processing"),
-                sample_audio_path=d.to_dict().get("sampleAudioPath", ""),
-                created_at=d.to_dict().get("createdAt", _now()),
-            )
-            for d in docs
-        ]
+        return [self._voice_from_doc(d.id, d.to_dict()) for d in docs]
 
     def create(self, uid: str, voice: Voice) -> Voice:
         self._ref(uid, voice.id).set({
