@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from ..services.embedding import EmbeddingService
     from ..services.search import SearchService
     from ..services.voice_cloner import VoiceClonerService
+    from ..services.catalog_publisher import CatalogPublisherService
 
 
 class StoryRepository(ABC):
@@ -144,3 +145,4 @@ class Services:
     embedding: EmbeddingService
     search: SearchService
     voice_cloner: VoiceClonerService
+    catalog_publisher: CatalogPublisherService

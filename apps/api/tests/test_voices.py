@@ -12,6 +12,7 @@ from mello_api.services.cover_generator import MockCoverGenerator
 from mello_api.services.embedding import MockEmbeddingService
 from mello_api.services.search import SearchService
 from mello_api.services.voice_cloner import MockVoiceCloner
+from mello_api.services.catalog_publisher import MockCatalogPublisher
 from mello_api.models.user import UserProfile
 from tests.fixtures import STORIES
 from tests.conftest import auth
@@ -36,6 +37,7 @@ def voice_client():
         embedding=embedding,
         search=SearchService(embedding_service=embedding),
         voice_cloner=MockVoiceCloner(),
+        catalog_publisher=MockCatalogPublisher(),
     )
     app = create_app(repos=repos, services=services)
     return TestClient(app)

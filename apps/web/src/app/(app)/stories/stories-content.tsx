@@ -9,7 +9,7 @@
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { useApiClient } from '@/hooks/useApiClient'
+import { fetchStoryList } from '@/lib/cdn'
 import { Icon } from '@/components/icon'
 import type { PaginatedResponse, StoryWithAudioUrl } from '@mello/types'
 
@@ -55,16 +55,12 @@ function formatTotalDuration(stories: StoryWithAudioUrl[]): string {
 export function StoriesContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const client = useApiClient()
-
   const topics = searchParams.get('topics') ?? ''
 
-  const qs = new URLSearchParams()
-  if (topics) qs.set('topics', topics)
-
+  // Fetch from static CDN catalog — no auth needed, no API server hit
   const { data, isLoading } = useQuery({
     queryKey: ['stories', topics],
-    queryFn: () => client.getList<StoryWithAudioUrl>(`/v1/stories?${qs.toString()}`),
+    queryFn: () => fetchStoryList<StoryWithAudioUrl>(topics || undefined),
   })
 
   const stories = (data as PaginatedResponse<StoryWithAudioUrl> | undefined)?.data ?? []

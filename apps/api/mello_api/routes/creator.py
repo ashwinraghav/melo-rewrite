@@ -17,6 +17,7 @@ from ..models.story import (
     GenerateStoryRequest,
     GenerateStoryResponse,
     Story,
+    StoryFilters,
     StoryWithAudioUrl,
     UpdateDraftRequest,
     categorize_duration,
@@ -170,6 +171,10 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
 
         # Invalidate search cache so the new story appears
         services.search.invalidate()
+
+        # Regenerate static catalog JSON so CDN serves the new story
+        all_stories = repos.stories.find_many(StoryFilters())
+        services.catalog_publisher.publish_catalog(all_stories)
 
         updated = repos.stories.find_by_id(story_id)
         return {"data": _resolve_story_urls(updated).model_dump(by_alias=True)}

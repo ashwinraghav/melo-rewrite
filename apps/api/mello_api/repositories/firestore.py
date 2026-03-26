@@ -66,8 +66,11 @@ class FirestoreStoryRepository(StoryRepository):
         self._credentials = credentials
         self._sa_email: str | None = None
         if not isinstance(credentials, SACredentials):
-            credentials.refresh(GoogleAuthRequest())
-            self._sa_email = credentials.service_account_email
+            try:
+                credentials.refresh(GoogleAuthRequest())
+                self._sa_email = credentials.service_account_email
+            except (AttributeError, Exception):
+                pass  # Local dev ADC — signed URLs won't work but public URLs do
 
     def find_by_id(self, story_id: str) -> Story | None:
         doc = self._db.collection("stories").document(story_id).get()
