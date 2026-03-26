@@ -9,6 +9,7 @@ import google.auth
 from google.auth.transport.requests import Request as GoogleAuthRequest
 from google.cloud import storage as gcs
 from google.oauth2.service_account import Credentials as SACredentials
+from google.cloud.firestore_v1.vector import Vector
 from ..models.story import Story, StoryFilters, StorySegment, categorize_duration
 from ..models.user import UserProfile
 from ..models.listening import Favorite, HistoryEntry
@@ -107,7 +108,7 @@ class FirestoreStoryRepository(StoryRepository):
                 for s in story.segments
             ],
             "themes": story.themes,
-            "embedding": story.embedding,
+            "embedding": Vector(story.embedding) if story.embedding else [],
             "source": story.source,
             "generateStatus": story.generate_status,
             "generateError": story.generate_error,
@@ -144,6 +145,8 @@ class FirestoreStoryRepository(StoryRepository):
                     {"text": s["text"], "startTime": s["startTime"], "endTime": s["endTime"]}
                     for s in v
                 ]
+            elif k == "embedding":
+                firestore_data["embedding"] = Vector(v) if v else []
             else:
                 firestore_data[field_map.get(k, k)] = v
         firestore_data["updatedAt"] = _now()
