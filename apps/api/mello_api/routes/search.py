@@ -11,7 +11,6 @@ from ..middleware.auth import get_current_user, AuthenticatedUser
 from ..models.story import (
     SearchStoriesRequest,
     Story,
-    StoryFilters,
     StoryWithAudioUrl,
 )
 from ..repositories.interfaces import Repositories, Services
@@ -49,11 +48,9 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         body: SearchStoriesRequest,
         _user: AuthenticatedUser = Depends(get_current_user),
     ):
-        all_stories = repos.stories.find_many(StoryFilters())
-
         results = services.search.search(
             query=body.query,
-            stories=all_stories,
+            story_repo=repos.stories,
             child_age=body.child_age,
             limit=body.limit,
         )

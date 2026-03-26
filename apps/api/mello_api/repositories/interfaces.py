@@ -31,6 +31,11 @@ class StoryRepository(ABC):
     def find_many(self, filters: StoryFilters) -> list[Story]: ...
 
     @abstractmethod
+    def vector_search(self, query_embedding: list[float], limit: int = 20) -> list[tuple[Story, float]]:
+        """KNN vector search on the embedding field. Returns (story, distance) pairs."""
+        ...
+
+    @abstractmethod
     def create(self, story: Story) -> Story: ...
 
     @abstractmethod

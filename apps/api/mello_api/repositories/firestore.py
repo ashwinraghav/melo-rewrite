@@ -173,6 +173,29 @@ class FirestoreStoryRepository(StoryRepository):
 
         return stories
 
+    def vector_search(self, query_embedding: list[float], limit: int = 20) -> list[tuple[Story, float]]:
+        from google.cloud.firestore_v1.base_vector_query import DistanceMeasure
+        from google.cloud.firestore_v1.vector import Vector
+
+        collection = self._db.collection("stories")
+        vector_query = collection.where("isPublished", "==", True).find_nearest(
+            vector_field="embedding",
+            query_vector=Vector(query_embedding),
+            distance_measure=DistanceMeasure.COSINE,
+            limit=limit,
+            distance_result_field="vector_distance",
+        )
+
+        results = []
+        for doc in vector_query.stream():
+            story = _story_from_doc(doc.id, doc.to_dict())
+            # Cosine distance: 0 = identical, 2 = opposite. Convert to similarity: 1 - distance.
+            distance = doc.to_dict().get("vector_distance", 1.0)
+            similarity = 1.0 - distance
+            results.append((story, similarity))
+
+        return results
+
     def _signed_url(self, path: str) -> str:
         blob = self._gcs_client.bucket(self._bucket_name).blob(path)
         expiration = timedelta(seconds=self._url_ttl_seconds)
