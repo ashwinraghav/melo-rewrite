@@ -33,16 +33,28 @@ class CloudTaskQueue(TaskQueueService):
         service_url: str,
         service_account_email: str,
     ) -> None:
-        from google.cloud import tasks_v2
-
-        self._client = tasks_v2.CloudTasksClient()
-        self._queue_path = self._client.queue_path(project_id, location, queue_name)
+        # Lazy-init the gRPC client to avoid slowing down container startup
+        self._project_id = project_id
+        self._location = location
+        self._queue_name = queue_name
         self._service_url = service_url.rstrip("/")
         self._service_account_email = service_account_email
+        self._client = None
+        self._queue_path: str | None = None
+
+    def _get_client(self):
+        if self._client is None:
+            from google.cloud import tasks_v2
+            self._client = tasks_v2.CloudTasksClient()
+            self._queue_path = self._client.queue_path(
+                self._project_id, self._location, self._queue_name,
+            )
+        return self._client
 
     def enqueue(self, task_type: str, payload: dict, dedup_id: str | None = None) -> None:
         from google.cloud import tasks_v2
 
+        client = self._get_client()
         url = f"{self._service_url}/internal/tasks/{task_type}"
 
         task: dict = {
@@ -59,11 +71,10 @@ class CloudTaskQueue(TaskQueueService):
         }
 
         if dedup_id:
-            # Cloud Tasks dedup IDs must be unique within 1 hour
             task["name"] = f"{self._queue_path}/tasks/{task_type}-{dedup_id}"
 
         try:
-            self._client.create_task(
+            client.create_task(
                 request={"parent": self._queue_path, "task": task},
             )
             log.info("Enqueued task %s (dedup=%s)", task_type, dedup_id)
