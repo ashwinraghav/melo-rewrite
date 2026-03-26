@@ -38,6 +38,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${plusJakarta.variable} ${lexend.variable}`}>
       <head>
+        {/* Preconnect to CDN and API so browsers warm connections early */}
+        <link rel="preconnect" href="https://cdn.melostories.com" />
+        <link rel="preconnect" href="https://mello-api-rhp2tqs5qa-uc.a.run.app" />
         {/* Material Symbols Rounded — used throughout the Stitch Editorial Serenity design */}
         <link
           rel="stylesheet"

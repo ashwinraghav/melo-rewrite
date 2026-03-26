@@ -165,6 +165,44 @@ The 364KB Material Symbols Rounded font is the largest single asset. Subsetting
 to only the ~15 icons used would save ~340KB and improve FCP by ~100-200ms.
 Deferred — diminishing returns at 0.91 score.
 
+### 9. Cloud CDN for story assets
+
+**Problem:** Cover art and audio served directly from `storage.googleapis.com`
+with no edge caching. Every request goes to GCS origin, adding latency for
+users far from `us-central1`.
+
+**Fix:** Cloud CDN via a global HTTPS load balancer with a backend bucket
+pointing to `melo-f5756-stories`. All story assets served from
+`cdn.melostories.com` with edge caching worldwide. Cache policy: 24h default
+TTL, 7d max TTL, serve-while-stale for 24h.
+
+**Infrastructure (Terraform):**
+- `google_compute_global_address` — static IP
+- `google_compute_backend_bucket` — CDN-enabled backend
+- `google_compute_url_map` + `google_compute_target_https_proxy` — routing
+- `google_compute_managed_ssl_certificate` — TLS for `cdn.melostories.com`
+- `google_dns_record_set` — DNS A record
+
+**Files:** `infra/terraform/cdn.tf`, `infra/terraform/main.tf`,
+`apps/api/mello_api/repositories/firestore.py`
+**Impact:** First request hits GCS, every subsequent request from that region
+served from edge (~10-20ms). Repeat visitors and users outside US see the
+biggest improvement.
+**Cost:** ~$0.08/GB egress + $0.01/10k requests
+
+### 10. Preconnect hints for CDN and API
+
+**Problem:** Browser doesn't know about `cdn.melostories.com` or the API
+origin until JS executes and makes fetch calls. DNS + TCP + TLS handshake
+happens cold on first request.
+
+**Fix:** Add `<link rel="preconnect">` in the root layout `<head>` for both
+the CDN domain and the API origin. Browser warms connections during HTML parse,
+before any JS runs.
+
+**File:** `apps/web/src/app/layout.tsx`
+**Impact:** -100-200ms on first image/API request per page load
+
 ## Architecture Pattern
 
 Every page now follows:

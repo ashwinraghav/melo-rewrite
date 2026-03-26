@@ -21,6 +21,7 @@ locals {
     "cloudresourcemanager.googleapis.com",
     "dns.googleapis.com",              # Cloud DNS (custom domain)
     "firebasestorage.googleapis.com",  # Firebase Storage (voice recordings)
+    "compute.googleapis.com",          # Cloud CDN + Load Balancer
   ]
 }
 

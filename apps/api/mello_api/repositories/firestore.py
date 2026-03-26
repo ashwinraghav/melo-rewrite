@@ -181,10 +181,10 @@ class FirestoreStoryRepository(StoryRepository):
         return self._signed_url(cover_art_path)
 
     def get_cover_art_public_url(self, cover_art_path: str) -> str:
-        return f"https://storage.googleapis.com/{self._bucket_name}/{cover_art_path}"
+        return f"https://cdn.melostories.com/{cover_art_path}"
 
     def get_audio_public_url(self, audio_path: str) -> str:
-        return f"https://storage.googleapis.com/{self._bucket_name}/{audio_path}"
+        return f"https://cdn.melostories.com/{audio_path}"
 
 
 class FirestoreUserRepository(UserRepository):

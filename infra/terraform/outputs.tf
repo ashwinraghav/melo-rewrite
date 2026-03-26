@@ -34,3 +34,13 @@ output "melostories_nameservers" {
   description = "Nameservers for melostories.com (managed by Cloud Domains)"
   value       = google_dns_managed_zone.melostories.name_servers
 }
+
+output "cdn_url" {
+  description = "Cloud CDN URL for story assets"
+  value       = "https://cdn.melostories.com"
+}
+
+output "cdn_ip" {
+  description = "Global static IP for the CDN load balancer"
+  value       = google_compute_global_address.cdn.address
+}
