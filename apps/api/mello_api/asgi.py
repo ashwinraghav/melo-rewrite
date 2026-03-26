@@ -12,6 +12,7 @@ from .services.audio_publisher import ElevenLabsPublisher
 from .services.cover_generator import VertexCoverGenerator
 from .services.embedding import VertexEmbeddingService
 from .services.search import SearchService
+from .services.voice_cloner import ElevenLabsVoiceCloner
 
 firebase_admin.initialize_app(options={"projectId": config.gcp_project_id})
 
@@ -47,6 +48,10 @@ if config.anthropic_api_key and config.elevenlabs_api_key:
                 gcp_location="us-central1",
             ),
             cohere_api_key=config.cohere_api_key,
+        ),
+        voice_cloner=ElevenLabsVoiceCloner(
+            api_key=config.elevenlabs_api_key,
+            firebase_bucket=f"{config.gcp_project_id}.firebasestorage.app",
         ),
     )
 
