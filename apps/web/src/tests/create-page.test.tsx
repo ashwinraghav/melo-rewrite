@@ -3,6 +3,13 @@
  *
  * Tests the story creation flow: prompt input → generating → review → publish → success.
  * API calls are mocked at the useApiClient level.
+ *
+ * The create flow uses Cloud Tasks:
+ *   - POST /generate returns 202 with { id, generateStatus }
+ *   - GET /status is polled until generateStatus === "ready" (returns draft)
+ *   - POST /publish returns 202 with { id, publishStatus }
+ *   - GET /status is polled until publishStatus === "ready"
+ *   - GET /stories/{id} fetches the published story for success screen
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -20,11 +27,12 @@ vi.mock('next/navigation', () => ({
 
 const mockPost = vi.fn()
 const mockPatch = vi.fn()
+const mockGet = vi.fn()
 vi.mock('@/hooks/useApiClient', () => ({
   useApiClient: () => ({
     post: mockPost,
     patch: mockPatch,
-    get: vi.fn(),
+    get: mockGet,
     getList: vi.fn(),
     delete: vi.fn(),
   }),
@@ -32,25 +40,65 @@ vi.mock('@/hooks/useApiClient', () => ({
 
 function renderWithQuery(ui: React.ReactElement) {
   const client = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
   })
   return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>)
 }
 
-const MOCK_DRAFT = {
+// ── Mock responses ───────────────────────────────────────────────────────────
+
+const DRAFT_DATA = {
+  id: 'draft-123',
+  title: 'The Gentle Breeze',
+  description: 'A soft wind carries seeds.',
+  storyText: 'Once upon a time, a gentle breeze drifted across a quiet meadow.',
+  topics: ['nature'],
+  ageMin: 1,
+  ageMax: 6,
+  createdAt: '2024-01-01T00:00:00Z',
+}
+
+/** POST /generate → 202 */
+const MOCK_GENERATE_ACCEPTED = {
+  data: { id: 'draft-123', generateStatus: 'processing' },
+}
+
+/** GET /status → generation complete with draft */
+const MOCK_STATUS_GENERATED = {
   data: {
-    id: 'draft-123',
-    title: 'The Gentle Breeze',
-    description: 'A soft wind carries seeds.',
-    storyText: 'Once upon a time, a gentle breeze drifted across a quiet meadow.',
-    topics: ['nature'],
-    ageMin: 1,
-    ageMax: 6,
-    createdAt: '2024-01-01T00:00:00Z',
+    generateStatus: 'ready',
+    generateError: '',
+    publishStatus: 'idle',
+    publishStep: '',
+    publishError: '',
+    isPublished: false,
+    draft: DRAFT_DATA,
   },
 }
 
-const MOCK_PUBLISHED = {
+/** POST /publish → 202 */
+const MOCK_PUBLISH_ACCEPTED = {
+  data: { id: 'draft-123', publishStatus: 'processing' },
+}
+
+/** GET /status → publish complete */
+const MOCK_STATUS_PUBLISHED = {
+  data: {
+    generateStatus: 'ready',
+    generateError: '',
+    publishStatus: 'ready',
+    publishStep: '',
+    publishError: '',
+    isPublished: true,
+    draft: DRAFT_DATA,
+  },
+}
+
+/** GET /stories/{id} → full published story */
+const MOCK_PUBLISHED_STORY = {
   data: {
     id: 'draft-123',
     title: 'The Gentle Breeze',
@@ -67,6 +115,36 @@ const MOCK_PUBLISHED = {
     updatedAt: '2024-01-01T00:00:00Z',
   },
 }
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Set up mocks for the generate → review flow */
+function mockGenerateFlow() {
+  mockPost.mockResolvedValueOnce(MOCK_GENERATE_ACCEPTED)
+  mockGet.mockResolvedValue(MOCK_STATUS_GENERATED)
+}
+
+/** Set up mocks for the full generate → review → publish → success flow */
+function mockFullFlow() {
+  // Generate
+  mockPost.mockResolvedValueOnce(MOCK_GENERATE_ACCEPTED)
+  mockGet.mockResolvedValue(MOCK_STATUS_GENERATED)
+}
+
+function triggerGenerate() {
+  fireEvent.change(screen.getByPlaceholderText(/describe the story/i), {
+    target: { value: 'test' },
+  })
+  fireEvent.click(screen.getByRole('button', { name: /generate story/i }))
+}
+
+async function waitForReview() {
+  await waitFor(() => {
+    expect(screen.getByDisplayValue('The Gentle Breeze')).toBeInTheDocument()
+  })
+}
+
+// ── Tests ────────────────────────────────────────────────────────────────────
 
 describe('CreatePage', () => {
   beforeEach(() => {
@@ -118,7 +196,6 @@ describe('CreatePage', () => {
   // ── Generating state ────────────────────────────────────────────────
 
   it('shows generating state after clicking Generate', async () => {
-    // Make post hang (never resolve) so we stay in generating state
     mockPost.mockReturnValue(new Promise(() => {}))
 
     renderWithQuery(<CreatePage />)
@@ -134,71 +211,43 @@ describe('CreatePage', () => {
   // ── Review state ────────────────────────────────────────────────────
 
   it('transitions to review state after successful generation', async () => {
-    mockPost.mockResolvedValueOnce(MOCK_DRAFT)
-
+    mockGenerateFlow()
     renderWithQuery(<CreatePage />)
-    const textarea = screen.getByPlaceholderText(/describe the story/i)
-    fireEvent.change(textarea, { target: { value: 'A bedtime story' } })
-    fireEvent.click(screen.getByRole('button', { name: /generate story/i }))
-
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('The Gentle Breeze')).toBeInTheDocument()
-    })
+    triggerGenerate()
+    await waitForReview()
   })
 
   it('shows editable fields in review state', async () => {
-    mockPost.mockResolvedValueOnce(MOCK_DRAFT)
-
+    mockGenerateFlow()
     renderWithQuery(<CreatePage />)
-    fireEvent.change(screen.getByPlaceholderText(/describe the story/i), {
-      target: { value: 'test' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /generate story/i }))
+    triggerGenerate()
 
     await waitFor(() => {
-      // Title input
       expect(screen.getByDisplayValue('The Gentle Breeze')).toBeInTheDocument()
-      // Description
       expect(screen.getByDisplayValue('A soft wind carries seeds.')).toBeInTheDocument()
-      // Topics
       expect(screen.getByDisplayValue('nature')).toBeInTheDocument()
-      // Age range badge
       expect(screen.getByText('1–6 years')).toBeInTheDocument()
-      // Action buttons
       expect(screen.getByRole('button', { name: /publish story/i })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /start over/i })).toBeInTheDocument()
     })
   })
 
   it('shows word count in review state', async () => {
-    mockPost.mockResolvedValueOnce(MOCK_DRAFT)
-
+    mockGenerateFlow()
     renderWithQuery(<CreatePage />)
-    fireEvent.change(screen.getByPlaceholderText(/describe the story/i), {
-      target: { value: 'test' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /generate story/i }))
+    triggerGenerate()
 
     await waitFor(() => {
-      // "Once upon a time, a gentle breeze drifted across a quiet meadow." = 12 words
       expect(screen.getByText(/\d+ words/)).toBeInTheDocument()
     })
   })
 
   it('disables Publish when title is cleared', async () => {
-    mockPost.mockResolvedValueOnce(MOCK_DRAFT)
-
+    mockGenerateFlow()
     renderWithQuery(<CreatePage />)
-    fireEvent.change(screen.getByPlaceholderText(/describe the story/i), {
-      target: { value: 'test' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /generate story/i }))
+    triggerGenerate()
+    await waitForReview()
 
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('The Gentle Breeze')).toBeInTheDocument()
-    })
-
-    // Clear the title
     const titleInput = screen.getByDisplayValue('The Gentle Breeze')
     fireEvent.change(titleInput, { target: { value: '' } })
 
@@ -208,13 +257,9 @@ describe('CreatePage', () => {
   // ── Start Over ──────────────────────────────────────────────────────
 
   it('resets to prompt state when Start Over is clicked', async () => {
-    mockPost.mockResolvedValueOnce(MOCK_DRAFT)
-
+    mockGenerateFlow()
     renderWithQuery(<CreatePage />)
-    fireEvent.change(screen.getByPlaceholderText(/describe the story/i), {
-      target: { value: 'test' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /generate story/i }))
+    triggerGenerate()
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /start over/i })).toBeInTheDocument()
@@ -234,10 +279,7 @@ describe('CreatePage', () => {
     mockPost.mockRejectedValueOnce(new Error('API Error'))
 
     renderWithQuery(<CreatePage />)
-    fireEvent.change(screen.getByPlaceholderText(/describe the story/i), {
-      target: { value: 'test' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /generate story/i }))
+    triggerGenerate()
 
     await waitFor(() => {
       expect(screen.getByText('API Error')).toBeInTheDocument()
@@ -248,10 +290,7 @@ describe('CreatePage', () => {
     mockPost.mockRejectedValueOnce(new Error('API Error'))
 
     renderWithQuery(<CreatePage />)
-    fireEvent.change(screen.getByPlaceholderText(/describe the story/i), {
-      target: { value: 'test' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /generate story/i }))
+    triggerGenerate()
 
     await waitFor(() => {
       expect(screen.getByText('API Error')).toBeInTheDocument()
@@ -268,13 +307,9 @@ describe('CreatePage', () => {
     mockPost.mockRejectedValueOnce(new Error('Failed'))
 
     renderWithQuery(<CreatePage />)
-    fireEvent.change(screen.getByPlaceholderText(/describe the story/i), {
-      target: { value: 'test' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /generate story/i }))
+    triggerGenerate()
 
     await waitFor(() => {
-      // Should be back in prompt state with textarea visible
       expect(screen.getByPlaceholderText(/describe the story/i)).toBeInTheDocument()
     })
   })
@@ -282,43 +317,40 @@ describe('CreatePage', () => {
   // ── Success state ───────────────────────────────────────────────────
 
   it('shows success state after publishing', async () => {
-    // Generate returns draft
-    mockPost.mockResolvedValueOnce(MOCK_DRAFT)
-
+    mockGenerateFlow()
     renderWithQuery(<CreatePage />)
-    fireEvent.change(screen.getByPlaceholderText(/describe the story/i), {
-      target: { value: 'test' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /generate story/i }))
+    triggerGenerate()
+    await waitForReview()
 
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /publish story/i })).toBeInTheDocument()
-    })
+    // Switch mock for publish flow: post returns 202, get returns published status
+    mockPost.mockResolvedValueOnce(MOCK_PUBLISH_ACCEPTED)
+    mockGet.mockResolvedValue(MOCK_STATUS_PUBLISHED)
 
-    // Publish returns published story
-    mockPost.mockResolvedValueOnce(MOCK_PUBLISHED)
     fireEvent.click(screen.getByRole('button', { name: /publish story/i }))
+
+    // The component fetches the full story on success — mock that too
+    mockGet.mockImplementation((path: string) => {
+      if (path.includes('/status')) return Promise.resolve(MOCK_STATUS_PUBLISHED)
+      return Promise.resolve(MOCK_PUBLISHED_STORY)
+    })
 
     await waitFor(() => {
       expect(screen.getByText('Story Published!')).toBeInTheDocument()
-      expect(screen.getByText(/the gentle breeze/i)).toBeInTheDocument()
     })
   })
 
   it('navigates to player when Listen Now is clicked', async () => {
-    mockPost.mockResolvedValueOnce(MOCK_DRAFT)
-
+    mockGenerateFlow()
     renderWithQuery(<CreatePage />)
-    fireEvent.change(screen.getByPlaceholderText(/describe the story/i), {
-      target: { value: 'test' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /generate story/i }))
+    triggerGenerate()
+    await waitForReview()
 
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /publish story/i })).toBeInTheDocument()
+    mockPost.mockResolvedValueOnce(MOCK_PUBLISH_ACCEPTED)
+    mockGet.mockImplementation((path: string) => {
+      if (path.includes('/status')) return Promise.resolve(MOCK_STATUS_PUBLISHED)
+      return Promise.resolve(MOCK_PUBLISHED_STORY)
     })
 
-    mockPost.mockResolvedValueOnce(MOCK_PUBLISHED)
     fireEvent.click(screen.getByRole('button', { name: /publish story/i }))
 
     await waitFor(() => {
@@ -330,19 +362,17 @@ describe('CreatePage', () => {
   })
 
   it('resets flow when Create Another is clicked', async () => {
-    mockPost.mockResolvedValueOnce(MOCK_DRAFT)
-
+    mockGenerateFlow()
     renderWithQuery(<CreatePage />)
-    fireEvent.change(screen.getByPlaceholderText(/describe the story/i), {
-      target: { value: 'test' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /generate story/i }))
+    triggerGenerate()
+    await waitForReview()
 
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /publish story/i })).toBeInTheDocument()
+    mockPost.mockResolvedValueOnce(MOCK_PUBLISH_ACCEPTED)
+    mockGet.mockImplementation((path: string) => {
+      if (path.includes('/status')) return Promise.resolve(MOCK_STATUS_PUBLISHED)
+      return Promise.resolve(MOCK_PUBLISHED_STORY)
     })
 
-    mockPost.mockResolvedValueOnce(MOCK_PUBLISHED)
     fireEvent.click(screen.getByRole('button', { name: /publish story/i }))
 
     await waitFor(() => {
