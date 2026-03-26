@@ -243,10 +243,12 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
                 "status": "ready",
             })
         except Exception:
-            repos.voices.update(invite.owner_uid, voice_id, {"status": "failed"})
+            # Clean up the voice doc so failed attempts don't consume quota.
+            # The invite stays "pending" so the user can retry with the same link.
+            repos.voices.delete(invite.owner_uid, voice_id)
             raise HTTPException(status_code=500, detail="Voice cloning failed. Please try again.")
 
-        # Mark invite as used
+        # Mark invite as used only on success
         repos.voice_invites.mark_used(token, voice_id)
 
         return {"data": {"voiceId": voice_id, "status": "ready"}}
