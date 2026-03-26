@@ -219,37 +219,31 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         voice_id = uuid.uuid4().hex
         now = _now()
 
-        # Upload sample to Firebase Storage
-        sample_path = services.voice_cloner.upload_sample(
-            invite.owner_uid, voice_id, audio_bytes,
-        )
-
-        # Create voice record as "processing"
-        voice = Voice(
-            id=voice_id,
-            name=invite.voice_name,
-            relationship=invite.relationship,
-            status="processing",
-            sample_audio_path=sample_path,
-            created_at=now,
-        )
-        repos.voices.create(invite.owner_uid, voice)
-
-        # Clone voice via ElevenLabs
         try:
-            result = services.voice_cloner.clone_voice(invite.voice_name, audio_bytes)
-            repos.voices.update(invite.owner_uid, voice_id, {
-                "eleven_labs_voice_id": result.eleven_labs_voice_id,
-                "status": "ready",
-            })
-        except Exception:
-            # Clean up the voice doc so failed attempts don't consume quota.
-            # The invite stays "pending" so the user can retry with the same link.
-            repos.voices.delete(invite.owner_uid, voice_id)
-            raise HTTPException(status_code=500, detail="Voice cloning failed. Please try again.")
+            # Upload sample to Firebase Storage
+            sample_path = services.voice_cloner.upload_sample(
+                invite.owner_uid, voice_id, audio_bytes,
+            )
 
-        # Mark invite as used only on success
-        repos.voice_invites.mark_used(token, voice_id)
+            # Clone voice via ElevenLabs
+            result = services.voice_cloner.clone_voice(invite.voice_name, audio_bytes)
+
+            # Only write to Firestore if both upload + clone succeeded
+            voice = Voice(
+                id=voice_id,
+                name=invite.voice_name,
+                relationship=invite.relationship,
+                eleven_labs_voice_id=result.eleven_labs_voice_id,
+                status="ready",
+                sample_audio_path=sample_path,
+                created_at=now,
+            )
+            repos.voices.create(invite.owner_uid, voice)
+            repos.voice_invites.mark_used(token, voice_id)
+        except Exception as exc:
+            import logging
+            logging.exception("Voice recording failed for token=%s: %s", token, exc)
+            raise HTTPException(status_code=500, detail=f"Voice recording failed: {exc}")
 
         return {"data": {"voiceId": voice_id, "status": "ready"}}
 
