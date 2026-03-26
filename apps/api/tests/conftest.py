@@ -1,3 +1,4 @@
+import json
 import pytest
 from fastapi.testclient import TestClient
 from mello_api.main import create_app
@@ -10,6 +11,7 @@ from mello_api.services.embedding import MockEmbeddingService
 from mello_api.services.search import SearchService
 from mello_api.services.voice_cloner import MockVoiceCloner
 from mello_api.services.catalog_publisher import MockCatalogPublisher
+from mello_api.services.task_queue import SyncTaskQueue
 from tests.fixtures import STORIES
 
 
@@ -24,6 +26,7 @@ def repos():
 @pytest.fixture
 def services():
     embedding = MockEmbeddingService()
+    # SyncTaskQueue handler is set after the app is created (see creator_client)
     return Services(
         story_generator=MockStoryGenerator(),
         audio_publisher=MockAudioPublisher(),
@@ -32,6 +35,7 @@ def services():
         search=SearchService(embedding_service=embedding),
         voice_cloner=MockVoiceCloner(),
         catalog_publisher=MockCatalogPublisher(),
+        task_queue=SyncTaskQueue(handler=lambda t, p: None),  # placeholder
     )
 
 
@@ -43,9 +47,21 @@ def client(repos):
 
 @pytest.fixture
 def creator_client(repos, services):
-    """Client with creator services enabled."""
+    """Client with creator services enabled. SyncTaskQueue dispatches to internal routes."""
     app = create_app(repos=repos, services=services)
-    return TestClient(app)
+    test_client = TestClient(app)
+
+    # Wire up SyncTaskQueue to dispatch tasks via the internal endpoint
+    def _dispatch(task_type: str, payload: dict) -> None:
+        resp = test_client.post(
+            f"/internal/tasks/{task_type}",
+            json=payload,
+        )
+        assert resp.status_code == 200, f"Task {task_type} failed: {resp.text}"
+
+    services.task_queue._handler = _dispatch
+
+    return test_client
 
 
 def auth(uid: str, email: str | None = None) -> dict:

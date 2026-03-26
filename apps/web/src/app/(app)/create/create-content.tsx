@@ -11,11 +11,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useApiClient } from '@/hooks/useApiClient'
 import { Icon } from '@/components/icon'
-import type { ApiResponse, GeneratedStoryDraft, StoryWithAudioUrl } from '@mello/types'
+import type { ApiResponse, GeneratedStoryDraft, StoryWithAudioUrl, PublishStatus, GenerateStatus } from '@mello/types'
 
 type FlowState = 'prompt' | 'generating' | 'review' | 'publishing' | 'success'
 
@@ -49,20 +49,17 @@ export function CreateContent() {
   const [editTopics, setEditTopics] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Generate mutation
+  // Story ID being generated/published — drives the status poll
+  const [activeStoryId, setActiveStoryId] = useState<string | null>(null)
+
+  // Generate mutation — returns 202 immediately, Cloud Tasks does the work
   const generateMutation = useMutation({
     mutationFn: (promptText: string) =>
-      client.post<GeneratedStoryDraft>('/v1/creator/generate', { prompt: promptText }),
+      client.post<{ id: string; generateStatus: string }>('/v1/creator/generate', { prompt: promptText }),
     retry: false,
     onSuccess: (response) => {
-      const data = (response as ApiResponse<GeneratedStoryDraft>).data
-      setDraft(data)
-      setEditTitle(data.title)
-      setEditDescription(data.description)
-      setEditText(data.storyText)
-      setEditTopics(data.topics.join(', '))
-      setError(null)
-      setState('review')
+      const data = (response as ApiResponse<{ id: string; generateStatus: string }>).data
+      setActiveStoryId(data.id)
     },
     onError: (err: Error) => {
       setError(err.message || 'Failed to generate story. Please try again.')
@@ -70,21 +67,85 @@ export function CreateContent() {
     },
   })
 
-  // Publish mutation — retry: false to prevent double-publish
+  // Publish mutation — returns 202 immediately, Cloud Tasks does the work
   const publishMutation = useMutation({
     mutationFn: (storyId: string) =>
-      client.post<StoryWithAudioUrl>(`/v1/creator/stories/${storyId}/publish`),
+      client.post<{ id: string; publishStatus: string }>(`/v1/creator/stories/${storyId}/publish`),
     retry: false,
-    onSuccess: (response) => {
-      const data = (response as ApiResponse<StoryWithAudioUrl>).data
-      setPublishedStory(data)
-      setState('success')
-    },
     onError: (err: Error) => {
       setError(err.message || 'Failed to publish. Please try again.')
       setState('review')
     },
   })
+
+  // Unified status poll — active during both generating and publishing states
+  interface StoryStatus {
+    generateStatus: GenerateStatus
+    generateError: string
+    publishStatus: PublishStatus
+    publishStep: string
+    publishError: string
+    isPublished: boolean
+    draft?: GeneratedStoryDraft
+  }
+
+  const isPolling = (state === 'generating' || state === 'publishing') && !!activeStoryId
+  const { data: statusData } = useQuery({
+    queryKey: ['story-status', activeStoryId],
+    queryFn: () => client.get<StoryStatus>(`/v1/creator/stories/${activeStoryId}/status`),
+    enabled: isPolling,
+    refetchInterval: 2000,
+  })
+
+  // Map server publishStep to phase index for the progress animation
+  const STEP_TO_PHASE: Record<string, number> = {
+    queued: 0,
+    generating_audio: 0,
+    creating_cover: 1,
+    generating_embedding: 2,
+    finalizing: 3,
+  }
+
+  // React to generate status changes
+  useEffect(() => {
+    if (!statusData || state !== 'generating') return
+    const status = (statusData as ApiResponse<StoryStatus>).data
+
+    if (status.generateStatus === 'ready' && status.draft) {
+      const d = status.draft
+      setDraft(d)
+      setEditTitle(d.title)
+      setEditDescription(d.description)
+      setEditText(d.storyText)
+      setEditTopics(d.topics.join(', '))
+      setError(null)
+      setState('review')
+    } else if (status.generateStatus === 'failed') {
+      setError(status.generateError || 'Failed to generate story. Please try again.')
+      setActiveStoryId(null)
+      setState('prompt')
+    }
+  }, [statusData, state]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // React to publish status changes
+  useEffect(() => {
+    if (!statusData || state !== 'publishing') return
+    const status = (statusData as ApiResponse<StoryStatus>).data
+
+    const phase = STEP_TO_PHASE[status.publishStep] ?? publishPhase
+    setPublishPhase(phase)
+
+    if (status.publishStatus === 'ready' && status.isPublished && draft) {
+      client.get<StoryWithAudioUrl>(`/v1/stories/${draft.id}`).then((resp) => {
+        setPublishedStory((resp as ApiResponse<StoryWithAudioUrl>).data)
+        setActiveStoryId(null)
+        setState('success')
+      })
+    } else if (status.publishStatus === 'failed') {
+      setError(status.publishError || 'Publishing failed. Please try again.')
+      setState('review')
+    }
+  }, [statusData, state]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Save edits before publishing
   const saveMutation = useMutation({
@@ -132,16 +193,18 @@ export function CreateContent() {
     setPrompt('')
     setDraft(null)
     setPublishedStory(null)
+    setActiveStoryId(null)
     setError(null)
     setPublishPhase(0)
   }, [])
 
-  // Cycle publish phases
+  // Fallback: cycle phases on a timer if server polling is slow
+  // This provides smooth UX even if there's a gap between poll responses
   useEffect(() => {
     if (state !== 'publishing') return
     const interval = setInterval(() => {
       setPublishPhase((prev) => Math.min(prev + 1, PUBLISH_PHASES.length - 1))
-    }, 8000)
+    }, 12000) // slower than before — server updates drive real progress
     return () => clearInterval(interval)
   }, [state])
 

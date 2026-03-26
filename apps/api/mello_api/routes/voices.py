@@ -102,11 +102,12 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
                 pass
         repos.voices.delete(user.uid, voice_id)
 
-    @router.post("/convert")
+    @router.post("/convert", status_code=202)
     def convert_story(
         body: ConvertStoryRequest,
         user: AuthenticatedUser = Depends(get_current_user),
     ):
+        """Enqueue story-to-voice conversion as a background task."""
         voice = repos.voices.find_by_id(user.uid, body.voice_id)
         if not voice or voice.status != "ready":
             raise HTTPException(status_code=400, detail="Voice not ready")
@@ -131,27 +132,23 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         )
         repos.conversions.create(user.uid, conversion)
 
-        try:
-            result = services.audio_publisher.publish(
-                body.story_id,
-                story.story_text,
-                voice_id=voice.eleven_labs_voice_id,
-                audio_path_override=audio_path,
-                bucket_override="melo-f5756.firebasestorage.app",
-            )
-            repos.conversions.update(user.uid, body.story_id, body.voice_id, {
-                "status": "ready",
-                "duration_seconds": result.duration_seconds,
-                "segments": result.segments,
-            })
-        except Exception:
-            repos.conversions.update(user.uid, body.story_id, body.voice_id, {
-                "status": "failed",
-            })
-            raise HTTPException(status_code=500, detail="Conversion failed")
+        services.task_queue.enqueue(
+            "convert-story",
+            {
+                "uid": user.uid,
+                "storyId": body.story_id,
+                "voiceId": body.voice_id,
+                "elevenLabsVoiceId": voice.eleven_labs_voice_id,
+                "storyText": story.story_text,
+                "audioPath": audio_path,
+                "bucketOverride": f"{services.voice_cloner._firebase_bucket}"
+                if hasattr(services.voice_cloner, '_firebase_bucket')
+                else "melo-f5756.firebasestorage.app",
+            },
+            dedup_id=f"{body.story_id}-{body.voice_id}",
+        )
 
-        updated = repos.conversions.find_by_id(user.uid, body.story_id, body.voice_id)
-        return {"data": updated.model_dump(by_alias=True) if updated else {}}
+        return {"data": conversion.model_dump(by_alias=True)}
 
     @router.get("/conversions/{story_id}")
     def list_conversions(
@@ -192,8 +189,9 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
             ).model_dump(by_alias=True)
         }
 
-    @router.post("/invite/{token}/record")
+    @router.post("/invite/{token}/record", status_code=202)
     async def record_voice(token: str, request: Request):
+        """Upload recording, start voice cloning as a background task."""
         invite = repos.voice_invites.find_by_token(token)
         if not invite:
             raise HTTPException(status_code=404, detail="Invite not found")
@@ -219,32 +217,35 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         voice_id = uuid.uuid4().hex
         now = _now()
 
-        try:
-            # Upload sample to Firebase Storage
-            sample_path = services.voice_cloner.upload_sample(
-                invite.owner_uid, voice_id, audio_bytes,
-            )
+        # Upload sample synchronously (small file, fast)
+        sample_path = services.voice_cloner.upload_sample(
+            invite.owner_uid, voice_id, audio_bytes,
+        )
 
-            # Clone voice via ElevenLabs
-            result = services.voice_cloner.clone_voice(invite.voice_name, audio_bytes)
+        # Create voice record as "processing" and mark invite as used
+        voice = Voice(
+            id=voice_id,
+            name=invite.voice_name,
+            relationship=invite.relationship,
+            status="processing",
+            sample_audio_path=sample_path,
+            created_at=now,
+        )
+        repos.voices.create(invite.owner_uid, voice)
+        repos.voice_invites.mark_used(token, voice_id)
 
-            # Only write to Firestore if both upload + clone succeeded
-            voice = Voice(
-                id=voice_id,
-                name=invite.voice_name,
-                relationship=invite.relationship,
-                eleven_labs_voice_id=result.eleven_labs_voice_id,
-                status="ready",
-                sample_audio_path=sample_path,
-                created_at=now,
-            )
-            repos.voices.create(invite.owner_uid, voice)
-            repos.voice_invites.mark_used(token, voice_id)
-        except Exception as exc:
-            import logging
-            logging.exception("Voice recording failed for token=%s: %s", token, exc)
-            raise HTTPException(status_code=500, detail=f"Voice recording failed: {exc}")
+        # Enqueue cloning as a background task
+        services.task_queue.enqueue(
+            "clone-voice",
+            {
+                "ownerUid": invite.owner_uid,
+                "voiceId": voice_id,
+                "voiceName": invite.voice_name,
+                "samplePath": sample_path,
+            },
+            dedup_id=voice_id,
+        )
 
-        return {"data": {"voiceId": voice_id, "status": "ready"}}
+        return {"data": {"voiceId": voice_id, "status": "processing"}}
 
     return router

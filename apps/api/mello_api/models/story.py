@@ -5,6 +5,8 @@ from pydantic.alias_generators import to_camel
 
 StoryDuration = Literal["short", "medium", "long"]
 StorySource = Literal["curated", "user"]
+PublishStatus = Literal["idle", "processing", "ready", "failed"]
+GenerateStatus = Literal["idle", "processing", "ready", "failed"]
 
 DURATION_THRESHOLDS = {"short_max": 299, "medium_max": 899}
 
@@ -43,6 +45,11 @@ class Story(CamelModel):
     themes: str = ""
     embedding: list[float] = []
     source: StorySource = "curated"
+    generate_status: GenerateStatus = "idle"
+    generate_error: str = ""
+    publish_status: PublishStatus = "idle"
+    publish_step: str = ""
+    publish_error: str = ""
     is_published: bool
     created_at: str
     updated_at: str
@@ -62,6 +69,11 @@ class StoryWithAudioUrl(CamelModel):
     story_text: str | None = None
     segments: list[StorySegment] | None = None
     source: StorySource = "curated"
+    generate_status: GenerateStatus = "idle"
+    generate_error: str = ""
+    publish_status: PublishStatus = "idle"
+    publish_step: str = ""
+    publish_error: str = ""
     is_published: bool
     created_at: str
     updated_at: str

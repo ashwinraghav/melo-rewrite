@@ -114,8 +114,10 @@ export function RecordContent() {
         </div>
         <h1 className="font-display text-2xl font-bold text-on-surface">Thank you!</h1>
         <p className="max-w-xs text-center font-body text-sm leading-relaxed text-on-surface-variant">
-          Your voice has been sent to {invite?.ownerDisplayName ? `${invite.ownerDisplayName}'s` : 'the'} family.
-          They can now hear their favorite stories in your voice.
+          Your voice is being processed and will be ready shortly.
+          {invite?.ownerDisplayName
+            ? ` ${invite.ownerDisplayName}'s family will be able to hear their favorite stories in your voice.`
+            : ' The family will be able to hear stories in your voice soon.'}
         </p>
         <p className="mt-4 font-body text-xs text-on-surface-variant/60">
           You can close this page.

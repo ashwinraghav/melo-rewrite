@@ -16,6 +16,12 @@ export type StoryDuration = 'short' | 'medium' | 'long'
 /** Where the story originated. */
 export type StorySource = 'curated' | 'user'
 
+/** Generation pipeline status for creator stories. */
+export type GenerateStatus = 'idle' | 'processing' | 'ready' | 'failed'
+
+/** Publish pipeline status for creator stories. */
+export type PublishStatus = 'idle' | 'processing' | 'ready' | 'failed'
+
 /**
  * Duration thresholds (seconds). Keep in one place so UI and API stay in sync.
  *

@@ -55,6 +55,12 @@ resource "google_cloud_run_v2_service" "api" {
         value = tostring(var.audio_url_ttl_seconds)
       }
 
+      # Cloud Tasks — the API needs its own URL to enqueue task callbacks
+      env {
+        name  = "SERVICE_URL"
+        value = "https://mello-api-rhp2tqs5qa-uc.a.run.app"
+      }
+
       # Creator service secrets (from Secret Manager)
       env {
         name = "ANTHROPIC_API_KEY"

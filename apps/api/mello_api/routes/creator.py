@@ -13,16 +13,18 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..middleware.auth import get_current_user, AuthenticatedUser
+from fastapi.responses import JSONResponse
+
 from ..models.story import (
     GenerateStoryRequest,
     GenerateStoryResponse,
     Story,
-    StoryFilters,
     StoryWithAudioUrl,
     UpdateDraftRequest,
-    categorize_duration,
 )
 from ..repositories.interfaces import Repositories, Services
+
+STALE_PUBLISH_SECONDS = 300  # 5 minutes
 
 
 def _now() -> str:
@@ -58,50 +60,45 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
             updated_at=story.updated_at,
         )
 
-    @router.post("/generate")
+    @router.post("/generate", status_code=202)
     def generate_story(
         body: GenerateStoryRequest,
         _user: AuthenticatedUser = Depends(get_current_user),
     ):
-        """Step 1: Generate story text from a prompt. Creates an unpublished draft."""
-
-        generated = services.story_generator.generate(body.prompt)
+        """Enqueue story generation as a background task. Returns 202 immediately."""
 
         story_id = uuid.uuid4().hex
         now = _now()
+
+        # Create a placeholder story — Claude will fill in content via the task
         story = Story(
             id=story_id,
-            title=generated.title,
-            description=generated.description,
+            title="",
+            description="",
             duration_seconds=0,
             duration_category="short",
-            age_min=generated.age_min,
-            age_max=generated.age_max,
-            topics=generated.topics,
+            age_min=1,
+            age_max=6,
+            topics=[],
             audio_path="",
             cover_art_path="",
-            story_text=generated.story_text,
+            story_text="",
             segments=[],
-            themes=generated.themes,
             source="user",
+            generate_status="processing",
             is_published=False,
             created_at=now,
             updated_at=now,
         )
         repos.stories.create(story)
 
-        return {
-            "data": GenerateStoryResponse(
-                id=story_id,
-                title=story.title,
-                description=story.description,
-                story_text=story.story_text,
-                topics=story.topics,
-                age_min=story.age_min,
-                age_max=story.age_max,
-                created_at=story.created_at,
-            ).model_dump(by_alias=True)
-        }
+        services.task_queue.enqueue(
+            "generate-story",
+            {"storyId": story_id, "prompt": body.prompt},
+            dedup_id=story_id,
+        )
+
+        return {"data": {"id": story_id, "generateStatus": "processing"}}
 
     @router.patch("/stories/{story_id}")
     def update_draft(
@@ -135,12 +132,12 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
             ).model_dump(by_alias=True)
         }
 
-    @router.post("/stories/{story_id}/publish")
+    @router.post("/stories/{story_id}/publish", status_code=202)
     def publish_story(
         story_id: str,
         _user: AuthenticatedUser = Depends(get_current_user),
     ):
-        """Step 2: Generate audio + cover art, upload to GCS, publish the story."""
+        """Enqueue story publishing as a background task. Returns 202 immediately."""
 
         story = repos.stories.find_by_id_any(story_id)
         if story is None:
@@ -148,35 +145,63 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         if story.is_published:
             raise HTTPException(status_code=400, detail="Story is already published")
 
-        # Generate audio with timestamps
-        audio_result = services.audio_publisher.publish(story_id, story.story_text)
-
-        # Generate cover art
-        cover_path = services.cover_generator.generate_and_upload(
-            story_id, story.title, story.description, story.topics
-        )
-
-        # Generate embedding for semantic search
-        embedding = services.embedding.embed_story(story)
+        # If already processing, check if stale (>5 min) — allow retry if so
+        if story.publish_status == "processing":
+            from datetime import datetime, timezone
+            try:
+                updated_at = datetime.fromisoformat(story.updated_at)
+                age = (datetime.now(timezone.utc) - updated_at).total_seconds()
+                if age < STALE_PUBLISH_SECONDS:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Story is already being published",
+                    )
+            except (ValueError, TypeError):
+                pass
 
         repos.stories.update(story_id, {
-            "audio_path": audio_result.audio_path,
-            "cover_art_path": cover_path,
-            "duration_seconds": audio_result.duration_seconds,
-            "duration_category": categorize_duration(audio_result.duration_seconds),
-            "segments": audio_result.segments,
-            "embedding": embedding,
-            "is_published": True,
+            "publish_status": "processing",
+            "publish_step": "queued",
+            "publish_error": "",
         })
 
-        # Invalidate search cache so the new story appears
-        services.search.invalidate()
+        services.task_queue.enqueue(
+            "publish-story",
+            {"storyId": story_id},
+            dedup_id=story_id,
+        )
 
-        # Regenerate static catalog JSON so CDN serves the new story
-        all_stories = repos.stories.find_many(StoryFilters())
-        services.catalog_publisher.publish_catalog(all_stories)
+        return {"data": {"id": story_id, "publishStatus": "processing"}}
 
-        updated = repos.stories.find_by_id(story_id)
-        return {"data": _resolve_story_urls(updated).model_dump(by_alias=True)}
+    @router.get("/stories/{story_id}/status")
+    def get_story_status(
+        story_id: str,
+        _user: AuthenticatedUser = Depends(get_current_user),
+    ):
+        """Poll for generate/publish progress."""
+        story = repos.stories.find_by_id_any(story_id)
+        if story is None:
+            raise HTTPException(status_code=404, detail="Story not found")
+        result: dict = {
+            "generateStatus": story.generate_status,
+            "generateError": story.generate_error,
+            "publishStatus": story.publish_status,
+            "publishStep": story.publish_step,
+            "publishError": story.publish_error,
+            "isPublished": story.is_published,
+        }
+        # Include draft content when generation is complete so frontend can populate review
+        if story.generate_status == "ready" and story.title:
+            result["draft"] = GenerateStoryResponse(
+                id=story.id,
+                title=story.title,
+                description=story.description,
+                story_text=story.story_text,
+                topics=story.topics,
+                age_min=story.age_min,
+                age_max=story.age_max,
+                created_at=story.created_at,
+            ).model_dump(by_alias=True)
+        return {"data": result}
 
     return router

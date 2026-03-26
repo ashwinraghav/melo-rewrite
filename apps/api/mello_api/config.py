@@ -24,5 +24,10 @@ class Config:
     # Search
     cohere_api_key: str = os.environ.get("COHERE_API_KEY", "")
 
+    # Cloud Tasks
+    cloud_tasks_queue: str = os.environ.get("CLOUD_TASKS_QUEUE", "mello-background")
+    cloud_tasks_location: str = os.environ.get("CLOUD_TASKS_LOCATION", "us-central1")
+    service_url: str = os.environ.get("SERVICE_URL", "http://localhost:8080")
+
 
 config = Config()

@@ -11,6 +11,7 @@ from .routes.me import make_router as make_me_router
 from .routes.creator import make_router as make_creator_router
 from .routes.search import make_router as make_search_router
 from .routes.voices import make_router as make_voices_router
+from .routes.tasks import make_router as make_tasks_router
 
 
 def create_app(
@@ -35,5 +36,6 @@ def create_app(
         app.include_router(make_creator_router(repos, services))
         app.include_router(make_search_router(repos, services))
         app.include_router(make_voices_router(repos, services))
+        app.include_router(make_tasks_router(repos, services))
 
     return app

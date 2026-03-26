@@ -67,6 +67,23 @@ resource "google_storage_bucket_iam_member" "stories_public_read" {
   member = "allUsers"
 }
 
+# ── Cloud Tasks ──────────────────────────────────────────────────────────────
+
+# The API service account enqueues tasks to the Cloud Tasks queue.
+resource "google_project_iam_member" "api_cloud_tasks_enqueuer" {
+  project = var.project_id
+  role    = "roles/cloudtasks.enqueuer"
+  member  = "serviceAccount:${google_service_account.api.email}"
+}
+
+# Cloud Tasks creates OIDC tokens signed as this service account when
+# delivering tasks to the Cloud Run service.
+resource "google_project_iam_member" "api_cloud_tasks_sa_user" {
+  project = var.project_id
+  role    = "roles/iam.serviceAccountUser"
+  member  = "serviceAccount:${google_service_account.api.email}"
+}
+
 # ── Cloud Run invoker (public access) ─────────────────────────────────────────
 
 # Both services are publicly accessible — users hit them directly from the browser.

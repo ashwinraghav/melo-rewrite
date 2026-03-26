@@ -25,20 +25,20 @@ def test_generate_creates_draft(creator_client, repos):
         json={"prompt": "a story about a gentle breeze in a meadow"},
         headers=auth(TEST_UID),
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 202
     data = resp.json()["data"]
+    assert data["generateStatus"] == "processing"
 
-    assert data["title"] == "The Gentle Breeze"
-    assert "storyText" in data
-    assert len(data["storyText"]) > 0
-    assert isinstance(data["topics"], list)
-    assert data["ageMin"] >= 1
-    assert data["ageMax"] <= 12
-
-    # Verify it was saved as unpublished
+    # SyncTaskQueue dispatched generate-story synchronously
     story = repos.stories.find_by_id_any(data["id"])
     assert story is not None
     assert story.is_published is False
+    assert story.generate_status == "ready"
+    assert story.title == "The Gentle Breeze"
+    assert len(story.story_text) > 0
+    assert isinstance(story.topics, list)
+    assert story.age_min >= 1
+    assert story.age_max <= 12
 
 
 # ── Update draft ───────────────────────────────────────────────────────────
@@ -108,23 +108,19 @@ def test_publish_story(creator_client, repos):
     )
     story_id = gen_resp.json()["data"]["id"]
 
-    # Publish
+    # Publish — returns 202, SyncTaskQueue completes the work synchronously
     resp = creator_client.post(
         f"/v1/creator/stories/{story_id}/publish",
         headers=auth(TEST_UID),
     )
-    assert resp.status_code == 200
-    data = resp.json()["data"]
+    assert resp.status_code == 202
+    assert resp.json()["data"]["publishStatus"] == "processing"
 
-    assert data["isPublished"] is True
-    assert data["durationSeconds"] > 0
-    assert "audioUrl" in data
-    assert "coverArtUrl" in data
-
-    # Verify it's now visible in the regular stories endpoint
+    # SyncTaskQueue dispatched the task synchronously, so the story should be published
     story = repos.stories.find_by_id(story_id)
     assert story is not None
     assert story.is_published is True
+    assert story.publish_status == "ready"
     assert story.audio_path != ""
     assert story.cover_art_path != ""
 
@@ -198,9 +194,9 @@ def test_update_single_field_preserves_others(creator_client, repos):
         json={"prompt": "test"},
         headers=auth(TEST_UID),
     )
-    data = gen_resp.json()["data"]
-    story_id = data["id"]
-    original_description = data["description"]
+    story_id = gen_resp.json()["data"]["id"]
+    # SyncTaskQueue completed — get original description from repo
+    original_description = repos.stories.find_by_id_any(story_id).description
 
     resp = creator_client.patch(
         f"/v1/creator/stories/{story_id}",
@@ -243,9 +239,9 @@ def test_published_story_retains_user_source(creator_client, repos):
         f"/v1/creator/stories/{story_id}/publish",
         headers=auth(TEST_UID),
     )
-    assert resp.status_code == 200
-    assert resp.json()["data"]["source"] == "user"
+    assert resp.status_code == 202
 
+    # SyncTaskQueue completed synchronously — verify source preserved
     story = repos.stories.find_by_id(story_id)
     assert story.source == "user"
 

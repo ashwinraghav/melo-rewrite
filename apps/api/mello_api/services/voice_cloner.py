@@ -28,6 +28,9 @@ class VoiceClonerService(ABC):
     def upload_sample(self, uid: str, voice_id: str, audio_bytes: bytes) -> str: ...
 
     @abstractmethod
+    def download_sample(self, path: str) -> bytes: ...
+
+    @abstractmethod
     def get_download_url(self, path: str) -> str: ...
 
 
@@ -74,6 +77,11 @@ class ElevenLabsVoiceCloner(VoiceClonerService):
         blob.upload_from_string(audio_bytes, content_type="audio/mpeg")
         return path
 
+    def download_sample(self, path: str) -> bytes:
+        bucket = fb_storage.bucket(self._firebase_bucket)
+        blob = bucket.blob(path)
+        return blob.download_as_bytes()
+
     def get_download_url(self, path: str) -> str:
         bucket = fb_storage.bucket(self._firebase_bucket)
         blob = bucket.blob(path)
@@ -95,6 +103,9 @@ class MockVoiceCloner(VoiceClonerService):
 
     def upload_conversion(self, uid: str, voice_id: str, story_id: str, audio_bytes: bytes) -> str:
         return f"voices/{uid}/{voice_id}/conversions/{story_id}.mp3"
+
+    def download_sample(self, path: str) -> bytes:
+        return b"mock-audio-bytes"
 
     def get_download_url(self, path: str) -> str:
         return f"https://storage.example.com/{path}"

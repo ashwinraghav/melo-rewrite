@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from ..services.search import SearchService
     from ..services.voice_cloner import VoiceClonerService
     from ..services.catalog_publisher import CatalogPublisherService
+    from ..services.task_queue import TaskQueueService
 
 
 class StoryRepository(ABC):
@@ -146,3 +147,4 @@ class Services:
     search: SearchService
     voice_cloner: VoiceClonerService
     catalog_publisher: CatalogPublisherService
+    task_queue: TaskQueueService

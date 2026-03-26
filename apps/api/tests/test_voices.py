@@ -13,6 +13,7 @@ from mello_api.services.embedding import MockEmbeddingService
 from mello_api.services.search import SearchService
 from mello_api.services.voice_cloner import MockVoiceCloner
 from mello_api.services.catalog_publisher import MockCatalogPublisher
+from mello_api.services.task_queue import SyncTaskQueue
 from mello_api.models.user import UserProfile
 from tests.fixtures import STORIES
 from tests.conftest import auth
@@ -38,9 +39,19 @@ def voice_client():
         search=SearchService(embedding_service=embedding),
         voice_cloner=MockVoiceCloner(),
         catalog_publisher=MockCatalogPublisher(),
+        task_queue=SyncTaskQueue(handler=lambda t, p: None),  # placeholder
     )
     app = create_app(repos=repos, services=services)
-    return TestClient(app)
+    test_client = TestClient(app)
+
+    # Wire up SyncTaskQueue to dispatch tasks via the internal endpoint
+    def _dispatch(task_type: str, payload: dict) -> None:
+        resp = test_client.post(f"/internal/tasks/{task_type}", json=payload)
+        assert resp.status_code == 200, f"Task {task_type} failed: {resp.text}"
+
+    services.task_queue._handler = _dispatch
+
+    return test_client
 
 
 FAKE_AUDIO = b"\x00" * 100_000  # 100KB — well over the 50KB minimum
@@ -127,12 +138,12 @@ def test_record_voice_creates_voice(voice_client):
         f"/v1/voices/invite/{token}/record",
         files={"audio": ("sample.webm", FAKE_AUDIO, "audio/webm")},
     )
-    assert r.status_code == 200
+    assert r.status_code == 202
     data = r.json()["data"]
-    assert data["status"] == "ready"
+    assert data["status"] == "processing"
     assert "voiceId" in data
 
-    # Voice should appear in user's list
+    # SyncTaskQueue dispatched clone-voice synchronously — voice should be ready
     r = voice_client.get("/v1/voices", headers=auth("user-1"))
     voices = r.json()["data"]
     assert len(voices) == 1
@@ -167,12 +178,12 @@ def test_record_voice_rejects_used_invite(voice_client):
     )
     token = r.json()["data"]["token"]
 
-    # First recording succeeds
+    # First recording succeeds (202 = accepted for background processing)
     r = voice_client.post(
         f"/v1/voices/invite/{token}/record",
         files={"audio": ("sample.webm", FAKE_AUDIO, "audio/webm")},
     )
-    assert r.status_code == 200
+    assert r.status_code == 202
 
     # Second recording with same token fails
     r = voice_client.post(
@@ -299,11 +310,15 @@ def test_convert_story_creates_conversion(voice_client):
         json={"storyId": story_id, "voiceId": voice_id},
         headers=auth("user-1"),
     )
-    assert r.status_code == 200
+    assert r.status_code == 202
     data = r.json()["data"]
-    assert data["status"] == "ready"
-    assert data["durationSeconds"] >= 0
-    assert "audioPath" in data
+    assert data["status"] == "processing"
+
+    # SyncTaskQueue dispatched convert-story synchronously — check via list endpoint
+    r = voice_client.get(f"/v1/voices/conversions/{story_id}", headers=auth("user-1"))
+    conv = r.json()["data"][0]
+    assert conv["status"] == "ready"
+    assert conv["durationSeconds"] >= 0
 
 
 def test_convert_story_rejects_unready_voice(voice_client):
@@ -337,7 +352,7 @@ def test_convert_duplicate_fails(voice_client):
         json={"storyId": story_id, "voiceId": voice_id},
         headers=auth("user-1"),
     )
-    assert r.status_code == 200
+    assert r.status_code == 202
 
     # Duplicate fails
     r = voice_client.post(

@@ -53,11 +53,15 @@ export function VoiceSwitcher({
     enabled: !!user,
   })
 
-  // Fetch conversions for this story
+  // Fetch conversions for this story — poll every 2s while any are processing
   const { data: conversionsData } = useQuery({
     queryKey: ['conversions', storyId],
     queryFn: () => client.getList<StoryConversion>(`/v1/voices/conversions/${storyId}`),
     enabled: !!user,
+    refetchInterval: (query) => {
+      const convs = (query.state.data as PaginatedResponse<StoryConversion> | undefined)?.data ?? []
+      return convs.some((c) => c.status === 'processing') ? 2000 : false
+    },
   })
 
   const voices = (voicesData as PaginatedResponse<Voice> | undefined)?.data ?? []

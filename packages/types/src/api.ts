@@ -163,6 +163,11 @@ export interface StoryWithAudioUrl {
   /** Timed segments for read-along (detail endpoint only). */
   segments?: import('./story.js').StorySegment[]
   source?: import('./story.js').StorySource
+  generateStatus?: import('./story.js').GenerateStatus
+  generateError?: string
+  publishStatus?: import('./story.js').PublishStatus
+  publishStep?: string
+  publishError?: string
   isPublished: boolean
   createdAt: string
   updatedAt: string
