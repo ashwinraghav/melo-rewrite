@@ -187,7 +187,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
             "data": InviteInfoResponse(
                 voice_name=invite.voice_name,
                 relationship=invite.relationship,
-                owner_display_name=owner.display_name if owner else "",
+                owner_display_name=(owner.display_name or "") if owner else "",
                 status=invite.status,
             ).model_dump(by_alias=True)
         }
