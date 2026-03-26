@@ -165,7 +165,26 @@ The 364KB Material Symbols Rounded font is the largest single asset. Subsetting
 to only the ~15 icons used would save ~340KB and improve FCP by ~100-200ms.
 Deferred — diminishing returns at 0.91 score.
 
-### 9. Cloud CDN for story assets
+### 9. Cache-Control headers on GCS story assets
+
+**Problem:** Cover art and audio objects in GCS had no `Cache-Control` header.
+Browsers re-fetched every image on every page load, even within the same
+session.
+
+**Fix:** Set `Cache-Control: public, max-age=86400, stale-while-revalidate=604800`
+on all objects under `stories/**`. Applied via `gsutil setmeta`.
+
+- `max-age=86400` — browser caches for 24 hours (no network request on revisit)
+- `stale-while-revalidate=604800` — serve stale for up to 7 days while
+  revalidating in the background
+
+**Impact:** Repeat visits to the same story load images instantly from browser
+cache (0ms). This is the optimization most visible during same-session testing.
+**Cost:** Free — just metadata on existing objects.
+**Note:** New objects uploaded by the API don't inherit this automatically.
+Consider setting default metadata in the upload code or a lifecycle policy.
+
+### 10. Cloud CDN for story assets (edge caching)
 
 **Problem:** Cover art and audio served directly from `storage.googleapis.com`
 with no edge caching. Every request goes to GCS origin, adding latency for
@@ -190,7 +209,7 @@ served from edge (~10-20ms). Repeat visitors and users outside US see the
 biggest improvement.
 **Cost:** ~$0.08/GB egress + $0.01/10k requests
 
-### 10. Preconnect hints for CDN and API
+### 11. Preconnect hints for CDN and API
 
 **Problem:** Browser doesn't know about `cdn.melostories.com` or the API
 origin until JS executes and makes fetch calls. DNS + TCP + TLS handshake
