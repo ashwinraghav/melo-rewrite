@@ -2,8 +2,22 @@
 Production ASGI entry point: uvicorn mello_api.asgi:app
 Initialises Firebase and creates the FastAPI app with Firestore repositories.
 """
+import sentry_sdk
 import firebase_admin
 from .config import config
+
+# Sentry — must be initialised before the FastAPI app is created.
+# The FastAPI integration is auto-discovered; no middleware needed.
+if config.sentry_dsn:
+    sentry_sdk.init(
+        dsn=config.sentry_dsn,
+        environment=config.env,
+        traces_sample_rate=0.1,
+        send_default_pii=False,
+        before_send_transaction=lambda event, _hint: (
+            None if event.get("transaction") == "/health" else event
+        ),
+    )
 from .main import create_app
 from .repositories.firestore import create_firestore_repositories
 from .repositories.interfaces import Services

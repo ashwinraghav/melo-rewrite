@@ -8,6 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 API_URL="${NEXT_PUBLIC_API_URL:-https://mello-api-rhp2tqs5qa-uc.a.run.app}"
 AUTH_DOMAIN="${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:-melostories.com}"
+SENTRY_DSN="${NEXT_PUBLIC_SENTRY_DSN:-https://fb605438406d94da9061258e2efc4004@o4511110152585216.ingest.us.sentry.io/4511110153502720}"
 
 echo "── Deploy Web ─────────────────────────────────────────"
 
@@ -23,7 +24,14 @@ pnpm --filter @mello/types build
 
 # Build static export with production API URL and same-origin authDomain
 echo "→ Building static export (API_URL=$API_URL, AUTH_DOMAIN=$AUTH_DOMAIN)..."
-NEXT_PUBLIC_API_URL="$API_URL" NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="$AUTH_DOMAIN" pnpm --filter @mello/web build
+NEXT_PUBLIC_API_URL="$API_URL" \
+  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="$AUTH_DOMAIN" \
+  NEXT_PUBLIC_SENTRY_DSN="$SENTRY_DSN" \
+  NEXT_PUBLIC_SENTRY_ENVIRONMENT=production \
+  SENTRY_AUTH_TOKEN="${SENTRY_AUTH_TOKEN:-}" \
+  SENTRY_ORG="${SENTRY_ORG:-}" \
+  SENTRY_PROJECT="${SENTRY_PROJECT:-}" \
+  pnpm --filter @mello/web build
 
 # Deploy
 echo "→ Deploying to Firebase Hosting..."

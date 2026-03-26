@@ -17,6 +17,7 @@ dependencies = [
     "cohere>=5.0",
     "google-cloud-tasks>=2.16",
     "python-multipart>=0.0.9",
+    "sentry-sdk[fastapi]>=2.0",
 ]
 
 [project.optional-dependencies]

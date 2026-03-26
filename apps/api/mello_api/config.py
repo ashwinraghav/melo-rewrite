@@ -29,5 +29,8 @@ class Config:
     cloud_tasks_location: str = os.environ.get("CLOUD_TASKS_LOCATION", "us-central1")
     service_url: str = os.environ.get("SERVICE_URL", "http://localhost:8080")
 
+    # Sentry (DSN is a public identifier, not a secret)
+    sentry_dsn: str = os.environ.get("SENTRY_DSN", "")
+
 
 config = Config()

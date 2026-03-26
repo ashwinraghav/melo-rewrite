@@ -97,6 +97,12 @@ resource "google_cloud_run_v2_service" "api" {
           }
         }
       }
+      # Sentry error monitoring (DSN is a public identifier, not a secret)
+      env {
+        name  = "SENTRY_DSN"
+        value = var.sentry_dsn
+      }
+
       # PORT is set automatically by Cloud Run — do not set it manually
 
       ports {

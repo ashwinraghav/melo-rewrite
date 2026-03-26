@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@mello/types": "workspace:*",
+    "@sentry/nextjs": "^10.46.0",
     "@tanstack/react-query": "^5.51.1",
     "clsx": "^2.1.1",
     "firebase": "^10.12.2",

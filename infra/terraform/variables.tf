@@ -68,3 +68,9 @@ variable "cohere_api_key" {
   type        = string
   sensitive   = true
 }
+
+variable "sentry_dsn" {
+  description = "Sentry DSN for API error monitoring (public identifier, not a secret)"
+  type        = string
+  default     = "https://fb605438406d94da9061258e2efc4004@o4511110152585216.ingest.us.sentry.io/4511110153502720"
+}
