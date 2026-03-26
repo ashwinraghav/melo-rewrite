@@ -20,6 +20,7 @@ locals {
     "iam.googleapis.com",              # IAM
     "cloudresourcemanager.googleapis.com",
     "dns.googleapis.com",              # Cloud DNS (custom domain)
+    "firebasestorage.googleapis.com",  # Firebase Storage (voice recordings)
   ]
 }
 
