@@ -60,6 +60,22 @@ Dark theme is the default (and primary) theme.
 **Client state:** TanStack Query for server data. Firebase Auth state via `useAuthContext()`.
 No Redux, no Zustand — keep it simple.
 
+**Route handlers (API):** **NEVER use `async def` for route handlers that call blocking code**
+(Firestore, external HTTP APIs, GCS, Cloud Tasks, etc.). Always use `def` (sync) — FastAPI runs
+sync handlers in a threadpool, keeping the event loop free. Only use `async def` when ALL I/O in
+the handler uses `await`. If you need multipart uploads, use `UploadFile = File(...)` instead of
+`await request.form()`.
+
+**Client initialization (API):** All external clients (GCS, Firestore, Cloud Tasks, Anthropic,
+Cohere, Vertex AI, ElevenLabs) MUST be created once in `__init__` and reused — never recreated
+per request or per method call. Use `requests.Session` (not bare `requests.post()`) for HTTP APIs
+to get connection pooling. All Google Cloud, Anthropic, and Cohere clients are thread-safe.
+
+**Background tasks (API):** Long-running operations (story generation, publishing, voice cloning,
+story conversion) are offloaded via Cloud Tasks to `/internal/tasks/` endpoints on the same
+Cloud Run service. User-facing endpoints return 202 immediately; frontends poll a status endpoint.
+Task handlers in `routes/tasks.py` must be `def` (sync), not `async def`.
+
 ## Adding a new API endpoint
 
 1. Add method to the relevant ABC in `mello_api/repositories/interfaces.py`
