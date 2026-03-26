@@ -38,13 +38,13 @@ class ElevenLabsVoiceCloner(VoiceClonerService):
     API_BASE = "https://api.elevenlabs.io/v1"
 
     def __init__(self, api_key: str, firebase_bucket: str) -> None:
-        self._api_key = api_key
         self._firebase_bucket = firebase_bucket
+        self._session = requests.Session()
+        self._session.headers.update({"xi-api-key": api_key})
 
     def clone_voice(self, name: str, audio_bytes: bytes) -> CloneResult:
-        resp = requests.post(
+        resp = self._session.post(
             f"{self.API_BASE}/voices/add",
-            headers={"xi-api-key": self._api_key},
             data={
                 "name": f"mello-{name}",
                 "description": f"Mello custom voice: {name}",
@@ -56,9 +56,8 @@ class ElevenLabsVoiceCloner(VoiceClonerService):
         return CloneResult(eleven_labs_voice_id=resp.json()["voice_id"])
 
     def delete_voice(self, eleven_labs_voice_id: str) -> None:
-        resp = requests.delete(
+        resp = self._session.delete(
             f"{self.API_BASE}/voices/{eleven_labs_voice_id}",
-            headers={"xi-api-key": self._api_key},
             timeout=30,
         )
         resp.raise_for_status()

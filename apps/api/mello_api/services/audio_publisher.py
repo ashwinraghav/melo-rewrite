@@ -45,20 +45,18 @@ class ElevenLabsPublisher(AudioPublisherService):
         bucket_name: str,
         gcp_project_id: str,
     ) -> None:
-        self._api_key = api_key
         self._voice_id = voice_id
         self._model_id = model_id
         self._bucket_name = bucket_name
         self._gcs_client = gcs.Client(project=gcp_project_id)
+        self._session = requests.Session()
+        self._session.headers.update({"xi-api-key": api_key})
 
     def _generate_with_timestamps(self, text: str, voice_id: str | None = None) -> dict:
         vid = voice_id or self._voice_id
-        resp = requests.post(
+        resp = self._session.post(
             f"{self.API_BASE}/text-to-speech/{vid}/with-timestamps",
-            headers={
-                "xi-api-key": self._api_key,
-                "Content-Type": "application/json",
-            },
+            headers={"Content-Type": "application/json"},
             json={
                 "text": text,
                 "model_id": self._model_id,
