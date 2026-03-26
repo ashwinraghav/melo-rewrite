@@ -24,7 +24,14 @@ class PublishResult:
 
 class AudioPublisherService(ABC):
     @abstractmethod
-    def publish(self, story_id: str, story_text: str) -> PublishResult: ...
+    def publish(
+        self,
+        story_id: str,
+        story_text: str,
+        voice_id: str | None = None,
+        audio_path_override: str | None = None,
+        bucket_override: str | None = None,
+    ) -> PublishResult: ...
 
 
 class ElevenLabsPublisher(AudioPublisherService):
@@ -44,9 +51,10 @@ class ElevenLabsPublisher(AudioPublisherService):
         self._bucket_name = bucket_name
         self._gcp_project_id = gcp_project_id
 
-    def _generate_with_timestamps(self, text: str) -> dict:
+    def _generate_with_timestamps(self, text: str, voice_id: str | None = None) -> dict:
+        vid = voice_id or self._voice_id
         resp = requests.post(
-            f"{self.API_BASE}/text-to-speech/{self._voice_id}/with-timestamps",
+            f"{self.API_BASE}/text-to-speech/{vid}/with-timestamps",
             headers={
                 "xi-api-key": self._api_key,
                 "Content-Type": "application/json",
@@ -106,16 +114,32 @@ class ElevenLabsPublisher(AudioPublisherService):
 
         return segments
 
-    def _upload_audio(self, story_id: str, audio_bytes: bytes) -> str:
-        gcs_path = f"stories/{story_id}/audio.mp3"
-        client = gcs.Client(project=self._gcp_project_id)
-        bucket = client.bucket(self._bucket_name)
+    def _upload_audio(
+        self, story_id: str, audio_bytes: bytes,
+        path_override: str | None = None, bucket_override: str | None = None,
+    ) -> str:
+        gcs_path = path_override or f"stories/{story_id}/audio.mp3"
+        bucket_name = bucket_override or self._bucket_name
+        if bucket_override:
+            # Firebase Storage bucket — use firebase_admin
+            import firebase_admin.storage as fb_storage
+            bucket = fb_storage.bucket(bucket_name)
+        else:
+            client = gcs.Client(project=self._gcp_project_id)
+            bucket = client.bucket(bucket_name)
         blob = bucket.blob(gcs_path)
         blob.upload_from_string(audio_bytes, content_type="audio/mpeg")
         return gcs_path
 
-    def publish(self, story_id: str, story_text: str) -> PublishResult:
-        result = self._generate_with_timestamps(story_text)
+    def publish(
+        self,
+        story_id: str,
+        story_text: str,
+        voice_id: str | None = None,
+        audio_path_override: str | None = None,
+        bucket_override: str | None = None,
+    ) -> PublishResult:
+        result = self._generate_with_timestamps(story_text, voice_id=voice_id)
 
         audio_bytes = base64.b64decode(result["audio_base64"])
         alignment = result["alignment"]
@@ -126,7 +150,11 @@ class ElevenLabsPublisher(AudioPublisherService):
             duration = int(len(story_text.split()) / 2.5)
 
         segments = self._chars_to_sentence_segments(story_text, alignment)
-        audio_path = self._upload_audio(story_id, audio_bytes)
+        audio_path = self._upload_audio(
+            story_id, audio_bytes,
+            path_override=audio_path_override,
+            bucket_override=bucket_override,
+        )
 
         return PublishResult(
             audio_path=audio_path,
@@ -138,7 +166,14 @@ class ElevenLabsPublisher(AudioPublisherService):
 class MockAudioPublisher(AudioPublisherService):
     """Returns canned data for tests — no API calls."""
 
-    def publish(self, story_id: str, story_text: str) -> PublishResult:
+    def publish(
+        self,
+        story_id: str,
+        story_text: str,
+        voice_id: str | None = None,
+        audio_path_override: str | None = None,
+        bucket_override: str | None = None,
+    ) -> PublishResult:
         sentences = re.split(r'(?<=[.!?])\s+', story_text.strip())
         duration = int(len(story_text.split()) / 2.5)
         time_per = duration / max(len(sentences), 1)
@@ -151,7 +186,7 @@ class MockAudioPublisher(AudioPublisherService):
             for i, s in enumerate(sentences) if s.strip()
         ]
         return PublishResult(
-            audio_path=f"stories/{story_id}/audio.mp3",
+            audio_path=audio_path_override or f"stories/{story_id}/audio.mp3",
             duration_seconds=duration,
             segments=segments,
         )

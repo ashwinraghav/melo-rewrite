@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from ..models.story import Story, StoryFilters
 from ..models.user import UserProfile
 from ..models.listening import Favorite, HistoryEntry
+from ..models.voice import Voice, VoiceInvite, Conversion
 
 if TYPE_CHECKING:
     from ..services.story_generator import StoryGeneratorService
@@ -12,6 +13,7 @@ if TYPE_CHECKING:
     from ..services.cover_generator import CoverGeneratorService
     from ..services.embedding import EmbeddingService
     from ..services.search import SearchService
+    from ..services.voice_cloner import VoiceClonerService
 
 
 class StoryRepository(ABC):
@@ -78,12 +80,60 @@ class HistoryRepository(ABC):
     def upsert(self, uid: str, story_id: str, progress_seconds: int, completed: bool) -> HistoryEntry: ...
 
 
+class VoiceRepository(ABC):
+    @abstractmethod
+    def find_by_id(self, uid: str, voice_id: str) -> Voice | None: ...
+
+    @abstractmethod
+    def find_all(self, uid: str) -> list[Voice]: ...
+
+    @abstractmethod
+    def create(self, uid: str, voice: Voice) -> Voice: ...
+
+    @abstractmethod
+    def update(self, uid: str, voice_id: str, data: dict) -> Voice | None: ...
+
+    @abstractmethod
+    def delete(self, uid: str, voice_id: str) -> None: ...
+
+    @abstractmethod
+    def count(self, uid: str) -> int: ...
+
+
+class VoiceInviteRepository(ABC):
+    @abstractmethod
+    def find_by_token(self, token: str) -> VoiceInvite | None: ...
+
+    @abstractmethod
+    def create(self, invite: VoiceInvite) -> VoiceInvite: ...
+
+    @abstractmethod
+    def mark_used(self, token: str, voice_id: str) -> VoiceInvite | None: ...
+
+
+class ConversionRepository(ABC):
+    @abstractmethod
+    def find_by_id(self, uid: str, story_id: str, voice_id: str) -> Conversion | None: ...
+
+    @abstractmethod
+    def find_all_for_story(self, uid: str, story_id: str) -> list[Conversion]: ...
+
+    @abstractmethod
+    def create(self, uid: str, conversion: Conversion) -> Conversion: ...
+
+    @abstractmethod
+    def update(self, uid: str, story_id: str, voice_id: str, data: dict) -> Conversion | None: ...
+
+
 @dataclass
 class Repositories:
     stories: StoryRepository
     users: UserRepository
     favorites: FavoriteRepository
     history: HistoryRepository
+    voices: VoiceRepository
+    voice_invites: VoiceInviteRepository
+    conversions: ConversionRepository
 
 
 @dataclass
@@ -93,3 +143,4 @@ class Services:
     cover_generator: CoverGeneratorService
     embedding: EmbeddingService
     search: SearchService
+    voice_cloner: VoiceClonerService

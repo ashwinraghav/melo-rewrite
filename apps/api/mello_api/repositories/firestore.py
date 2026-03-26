@@ -12,7 +12,11 @@ from google.oauth2.service_account import Credentials as SACredentials
 from ..models.story import Story, StoryFilters, StorySegment, categorize_duration
 from ..models.user import UserProfile
 from ..models.listening import Favorite, HistoryEntry
-from .interfaces import StoryRepository, UserRepository, FavoriteRepository, HistoryRepository, Repositories
+from ..models.voice import Voice, VoiceInvite, Conversion
+from .interfaces import (
+    StoryRepository, UserRepository, FavoriteRepository, HistoryRepository,
+    VoiceRepository, VoiceInviteRepository, ConversionRepository, Repositories,
+)
 
 if TYPE_CHECKING:
     import google.cloud.firestore
@@ -309,6 +313,180 @@ class FirestoreHistoryRepository(HistoryRepository):
         )
 
 
+class FirestoreVoiceRepository(VoiceRepository):
+    def __init__(self, db: "google.cloud.firestore.Client") -> None:
+        self._db = db
+
+    def _ref(self, uid: str, voice_id: str):
+        return self._db.collection("users").document(uid).collection("voices").document(voice_id)
+
+    def _col(self, uid: str):
+        return self._db.collection("users").document(uid).collection("voices")
+
+    def find_by_id(self, uid: str, voice_id: str) -> Voice | None:
+        doc = self._ref(uid, voice_id).get()
+        if not doc.exists:
+            return None
+        d = doc.to_dict()
+        return Voice(
+            id=doc.id,
+            name=d.get("name", ""),
+            relationship=d.get("relationship", ""),
+            eleven_labs_voice_id=d.get("elevenLabsVoiceId", ""),
+            status=d.get("status", "processing"),
+            sample_audio_path=d.get("sampleAudioPath", ""),
+            created_at=d.get("createdAt", _now()),
+        )
+
+    def find_all(self, uid: str) -> list[Voice]:
+        docs = self._col(uid).stream()
+        return [
+            Voice(
+                id=d.id,
+                name=d.to_dict().get("name", ""),
+                relationship=d.to_dict().get("relationship", ""),
+                eleven_labs_voice_id=d.to_dict().get("elevenLabsVoiceId", ""),
+                status=d.to_dict().get("status", "processing"),
+                sample_audio_path=d.to_dict().get("sampleAudioPath", ""),
+                created_at=d.to_dict().get("createdAt", _now()),
+            )
+            for d in docs
+        ]
+
+    def create(self, uid: str, voice: Voice) -> Voice:
+        self._ref(uid, voice.id).set({
+            "name": voice.name,
+            "relationship": voice.relationship,
+            "elevenLabsVoiceId": voice.eleven_labs_voice_id,
+            "status": voice.status,
+            "sampleAudioPath": voice.sample_audio_path,
+            "createdAt": voice.created_at,
+        })
+        return voice
+
+    def update(self, uid: str, voice_id: str, data: dict) -> Voice | None:
+        field_map = {
+            "eleven_labs_voice_id": "elevenLabsVoiceId",
+            "sample_audio_path": "sampleAudioPath",
+            "created_at": "createdAt",
+        }
+        firestore_data = {field_map.get(k, k): v for k, v in data.items()}
+        self._ref(uid, voice_id).update(firestore_data)
+        return self.find_by_id(uid, voice_id)
+
+    def delete(self, uid: str, voice_id: str) -> None:
+        self._ref(uid, voice_id).delete()
+
+    def count(self, uid: str) -> int:
+        return len(list(self._col(uid).stream()))
+
+
+class FirestoreVoiceInviteRepository(VoiceInviteRepository):
+    def __init__(self, db: "google.cloud.firestore.Client") -> None:
+        self._db = db
+
+    def _ref(self, token: str):
+        return self._db.collection("voiceInvites").document(token)
+
+    def find_by_token(self, token: str) -> VoiceInvite | None:
+        doc = self._ref(token).get()
+        if not doc.exists:
+            return None
+        d = doc.to_dict()
+        return VoiceInvite(
+            token=doc.id,
+            owner_uid=d.get("ownerUid", ""),
+            voice_name=d.get("voiceName", ""),
+            relationship=d.get("relationship", ""),
+            status=d.get("status", "pending"),
+            voice_id=d.get("voiceId"),
+            created_at=d.get("createdAt", _now()),
+            expires_at=d.get("expiresAt", _now()),
+        )
+
+    def create(self, invite: VoiceInvite) -> VoiceInvite:
+        self._ref(invite.token).set({
+            "ownerUid": invite.owner_uid,
+            "voiceName": invite.voice_name,
+            "relationship": invite.relationship,
+            "status": invite.status,
+            "voiceId": invite.voice_id,
+            "createdAt": invite.created_at,
+            "expiresAt": invite.expires_at,
+        })
+        return invite
+
+    def mark_used(self, token: str, voice_id: str) -> VoiceInvite | None:
+        self._ref(token).update({"status": "used", "voiceId": voice_id})
+        return self.find_by_token(token)
+
+
+class FirestoreConversionRepository(ConversionRepository):
+    def __init__(self, db: "google.cloud.firestore.Client") -> None:
+        self._db = db
+
+    @staticmethod
+    def _doc_id(story_id: str, voice_id: str) -> str:
+        return f"{story_id}_{voice_id}"
+
+    def _ref(self, uid: str, story_id: str, voice_id: str):
+        doc_id = self._doc_id(story_id, voice_id)
+        return self._db.collection("users").document(uid).collection("conversions").document(doc_id)
+
+    def _col(self, uid: str):
+        return self._db.collection("users").document(uid).collection("conversions")
+
+    def _from_doc(self, doc) -> Conversion:
+        d = doc.to_dict()
+        return Conversion(
+            story_id=d.get("storyId", ""),
+            voice_id=d.get("voiceId", ""),
+            status=d.get("status", "pending"),
+            audio_path=d.get("audioPath", ""),
+            duration_seconds=d.get("durationSeconds", 0),
+            segments=d.get("segments", []),
+            created_at=d.get("createdAt", _now()),
+            updated_at=d.get("updatedAt", _now()),
+        )
+
+    def find_by_id(self, uid: str, story_id: str, voice_id: str) -> Conversion | None:
+        doc = self._ref(uid, story_id, voice_id).get()
+        if not doc.exists:
+            return None
+        return self._from_doc(doc)
+
+    def find_all_for_story(self, uid: str, story_id: str) -> list[Conversion]:
+        docs = self._col(uid).where("storyId", "==", story_id).stream()
+        return [self._from_doc(d) for d in docs]
+
+    def create(self, uid: str, conversion: Conversion) -> Conversion:
+        self._ref(uid, conversion.story_id, conversion.voice_id).set({
+            "storyId": conversion.story_id,
+            "voiceId": conversion.voice_id,
+            "status": conversion.status,
+            "audioPath": conversion.audio_path,
+            "durationSeconds": conversion.duration_seconds,
+            "segments": conversion.segments,
+            "createdAt": conversion.created_at,
+            "updatedAt": conversion.updated_at,
+        })
+        return conversion
+
+    def update(self, uid: str, story_id: str, voice_id: str, data: dict) -> Conversion | None:
+        field_map = {
+            "story_id": "storyId",
+            "voice_id": "voiceId",
+            "audio_path": "audioPath",
+            "duration_seconds": "durationSeconds",
+            "created_at": "createdAt",
+            "updated_at": "updatedAt",
+        }
+        firestore_data = {field_map.get(k, k): v for k, v in data.items()}
+        firestore_data["updatedAt"] = _now()
+        self._ref(uid, story_id, voice_id).update(firestore_data)
+        return self.find_by_id(uid, story_id, voice_id)
+
+
 def create_firestore_repositories(project_id: str, bucket_name: str, url_ttl_seconds: int) -> Repositories:
     from google.cloud import firestore as gc_firestore
 
@@ -318,4 +496,7 @@ def create_firestore_repositories(project_id: str, bucket_name: str, url_ttl_sec
         users=FirestoreUserRepository(db),
         favorites=FirestoreFavoriteRepository(db),
         history=FirestoreHistoryRepository(db),
+        voices=FirestoreVoiceRepository(db),
+        voice_invites=FirestoreVoiceInviteRepository(db),
+        conversions=FirestoreConversionRepository(db),
     )

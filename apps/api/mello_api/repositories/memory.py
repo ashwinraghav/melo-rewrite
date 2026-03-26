@@ -8,7 +8,11 @@ from copy import deepcopy
 from ..models.story import Story, StoryFilters, categorize_duration
 from ..models.user import UserProfile
 from ..models.listening import Favorite, HistoryEntry
-from .interfaces import StoryRepository, UserRepository, FavoriteRepository, HistoryRepository, Repositories
+from ..models.voice import Voice, VoiceInvite, Conversion
+from .interfaces import (
+    StoryRepository, UserRepository, FavoriteRepository, HistoryRepository,
+    VoiceRepository, VoiceInviteRepository, ConversionRepository, Repositories,
+)
 
 
 def _now() -> str:
@@ -145,10 +149,99 @@ class MemoryHistoryRepository(HistoryRepository):
         return entry
 
 
+class MemoryVoiceRepository(VoiceRepository):
+    def __init__(self) -> None:
+        self._voices: dict[str, dict[str, Voice]] = {}  # uid → {voiceId → Voice}
+
+    def find_by_id(self, uid: str, voice_id: str) -> Voice | None:
+        return self._voices.get(uid, {}).get(voice_id)
+
+    def find_all(self, uid: str) -> list[Voice]:
+        return list(self._voices.get(uid, {}).values())
+
+    def create(self, uid: str, voice: Voice) -> Voice:
+        if uid not in self._voices:
+            self._voices[uid] = {}
+        self._voices[uid][voice.id] = voice
+        return voice
+
+    def update(self, uid: str, voice_id: str, data: dict) -> Voice | None:
+        voice = self._voices.get(uid, {}).get(voice_id)
+        if voice is None:
+            return None
+        updated = voice.model_copy(update=data)
+        self._voices[uid][voice_id] = updated
+        return updated
+
+    def delete(self, uid: str, voice_id: str) -> None:
+        self._voices.get(uid, {}).pop(voice_id, None)
+
+    def count(self, uid: str) -> int:
+        return len(self._voices.get(uid, {}))
+
+
+class MemoryVoiceInviteRepository(VoiceInviteRepository):
+    def __init__(self) -> None:
+        self._invites: dict[str, VoiceInvite] = {}  # token → VoiceInvite
+
+    def find_by_token(self, token: str) -> VoiceInvite | None:
+        return self._invites.get(token)
+
+    def create(self, invite: VoiceInvite) -> VoiceInvite:
+        self._invites[invite.token] = invite
+        return invite
+
+    def mark_used(self, token: str, voice_id: str) -> VoiceInvite | None:
+        invite = self._invites.get(token)
+        if invite is None:
+            return None
+        updated = invite.model_copy(update={"status": "used", "voice_id": voice_id})
+        self._invites[token] = updated
+        return updated
+
+
+class MemoryConversionRepository(ConversionRepository):
+    def __init__(self) -> None:
+        # uid → {compound_key → Conversion}
+        self._conversions: dict[str, dict[str, Conversion]] = {}
+
+    @staticmethod
+    def _key(story_id: str, voice_id: str) -> str:
+        return f"{story_id}_{voice_id}"
+
+    def find_by_id(self, uid: str, story_id: str, voice_id: str) -> Conversion | None:
+        return self._conversions.get(uid, {}).get(self._key(story_id, voice_id))
+
+    def find_all_for_story(self, uid: str, story_id: str) -> list[Conversion]:
+        return [
+            c for c in self._conversions.get(uid, {}).values()
+            if c.story_id == story_id
+        ]
+
+    def create(self, uid: str, conversion: Conversion) -> Conversion:
+        if uid not in self._conversions:
+            self._conversions[uid] = {}
+        key = self._key(conversion.story_id, conversion.voice_id)
+        self._conversions[uid][key] = conversion
+        return conversion
+
+    def update(self, uid: str, story_id: str, voice_id: str, data: dict) -> Conversion | None:
+        key = self._key(story_id, voice_id)
+        conversion = self._conversions.get(uid, {}).get(key)
+        if conversion is None:
+            return None
+        updated = conversion.model_copy(update={**data, "updated_at": _now()})
+        self._conversions[uid][key] = updated
+        return updated
+
+
 def create_memory_repositories() -> Repositories:
     return Repositories(
         stories=MemoryStoryRepository(),
         users=MemoryUserRepository(),
         favorites=MemoryFavoriteRepository(),
         history=MemoryHistoryRepository(),
+        voices=MemoryVoiceRepository(),
+        voice_invites=MemoryVoiceInviteRepository(),
+        conversions=MemoryConversionRepository(),
     )

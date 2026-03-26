@@ -8,6 +8,7 @@ from mello_api.services.audio_publisher import MockAudioPublisher
 from mello_api.services.cover_generator import MockCoverGenerator
 from mello_api.services.embedding import MockEmbeddingService
 from mello_api.services.search import SearchService
+from mello_api.services.voice_cloner import MockVoiceCloner
 from tests.fixtures import STORIES
 
 
@@ -28,6 +29,7 @@ def services():
         cover_generator=MockCoverGenerator(),
         embedding=embedding,
         search=SearchService(embedding_service=embedding),
+        voice_cloner=MockVoiceCloner(),
     )
 
 
