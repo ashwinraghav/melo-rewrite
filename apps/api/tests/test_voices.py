@@ -218,7 +218,7 @@ def test_record_voice_rejects_missing_audio(voice_client):
     token = r.json()["data"]["token"]
 
     r = voice_client.post(f"/v1/voices/invite/{token}/record")
-    assert r.status_code == 400
+    assert r.status_code == 422  # FastAPI validates required File parameter
 
 
 # ── Voice management ──────────────────────────────────────────────────────────

@@ -17,7 +17,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 
 from ..middleware.auth import get_current_user, AuthenticatedUser
 from ..models.voice import (
@@ -190,7 +190,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         }
 
     @router.post("/invite/{token}/record", status_code=202)
-    async def record_voice(token: str, request: Request):
+    def record_voice(token: str, audio: UploadFile = File(...)):
         """Upload recording, start voice cloning as a background task."""
         invite = repos.voice_invites.find_by_token(token)
         if not invite:
@@ -202,11 +202,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         if repos.voices.count(invite.owner_uid) >= MAX_VOICES_PER_USER:
             raise HTTPException(status_code=400, detail="Voice limit reached for this account")
 
-        form = await request.form()
-        audio_file = form.get("audio")
-        if not audio_file:
-            raise HTTPException(status_code=400, detail="No audio file provided")
-        audio_bytes = await audio_file.read()
+        audio_bytes = audio.file.read()
 
         if len(audio_bytes) < MIN_RECORDING_BYTES:
             raise HTTPException(
