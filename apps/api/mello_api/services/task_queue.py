@@ -33,28 +33,17 @@ class CloudTaskQueue(TaskQueueService):
         service_url: str,
         service_account_email: str,
     ) -> None:
-        # Lazy-init the gRPC client to avoid slowing down container startup
-        self._project_id = project_id
-        self._location = location
-        self._queue_name = queue_name
+        from google.cloud import tasks_v2
+
+        self._client = tasks_v2.CloudTasksClient()
+        self._queue_path = self._client.queue_path(project_id, location, queue_name)
         self._service_url = service_url.rstrip("/")
         self._service_account_email = service_account_email
-        self._client = None
-        self._queue_path: str | None = None
-
-    def _get_client(self):
-        if self._client is None:
-            from google.cloud import tasks_v2
-            self._client = tasks_v2.CloudTasksClient()
-            self._queue_path = self._client.queue_path(
-                self._project_id, self._location, self._queue_name,
-            )
-        return self._client
 
     def enqueue(self, task_type: str, payload: dict, dedup_id: str | None = None) -> None:
         from google.cloud import tasks_v2
 
-        client = self._get_client()
+        client = self._client
         url = f"{self._service_url}/internal/tasks/{task_type}"
 
         task: dict = {
