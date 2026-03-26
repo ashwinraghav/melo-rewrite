@@ -10,7 +10,6 @@
 
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { useAuthContext } from '@/context/auth-context'
 import { Icon } from '@/components/icon'
 
 const TOPICS = [
@@ -22,7 +21,6 @@ const TOPICS = [
 
 export function DiscoverContent() {
   const router = useRouter()
-  const { signOut } = useAuthContext()
 
   return (
     <div className="px-6 py-8 pb-28">
@@ -33,13 +31,6 @@ export function DiscoverContent() {
           <h1 className="font-display text-2xl font-bold tracking-tight text-on-surface">
             Storybook
           </h1>
-          <button
-            onClick={signOut}
-            className="ml-auto flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-high/40 transition-all hover:bg-surface-container-highest/60"
-            aria-label="Sign out"
-          >
-            <Icon name="logout" size={20} className="text-on-surface-variant" />
-          </button>
         </div>
 
         <h2 className="mt-6 font-display text-xl font-semibold text-on-surface">

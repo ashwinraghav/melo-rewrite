@@ -9,8 +9,6 @@ const TABS = [
   { href: '/discover', label: 'Home', icon: 'auto_stories' },
   { href: '/search', label: 'Search', icon: 'search' },
   { href: '/create', label: 'Create', icon: 'edit_note' },
-  { href: '/favorites', label: 'Favorites', icon: 'favorite' },
-  { href: '/history', label: 'History', icon: 'history' },
 ]
 
 export function BottomNav() {

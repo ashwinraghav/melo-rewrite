@@ -13,10 +13,11 @@
  * instead of waiting for auth → API → images.
  */
 
-import { Suspense, useEffect, type ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useAuthContext } from '@/context/auth-context'
 import { BottomNav } from '@/components/bottom-nav'
+import { AccountMenu } from '@/components/account-menu'
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const { user, loading } = useAuthContext()
@@ -31,6 +32,12 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-dvh flex-col">
+      {/* Account menu — top-right on all pages except player */}
+      {!isPlayer && !loading && user && (
+        <div className="fixed right-4 top-4 z-50">
+          <AccountMenu />
+        </div>
+      )}
       <main className={`flex-1 ${isPlayer ? '' : 'pb-20'}`}>
         {children}
       </main>
