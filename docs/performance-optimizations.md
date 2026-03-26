@@ -1,0 +1,184 @@
+# Performance Optimizations — Lighthouse 0.64 → 0.91
+
+Performed on 2026-03-25/26 against `melostories.com/stories?topics=park`.
+Lighthouse simulates Moto G Power on slow 4G.
+
+## Results Summary
+
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| **Performance Score** | 0.64 | 0.91 | +42% |
+| **FCP** | 4,512ms | 1,659ms | -63% |
+| **LCP** | 7,352ms | 2,917ms | -60% |
+| **Speed Index** | 4,729ms | 3,484ms | -26% |
+| **API server latency** | 1,351ms | 323ms | -76% |
+| **API response size** | 24,460 B | 6,493 B | -73% |
+| **API call duration** | 2,615ms | 397ms | -85% |
+| TBT | 2ms | 0ms | — |
+| CLS | 0.003 | 0.0005 | better |
+
+## Optimizations Applied
+
+### 1. Cache GCS client and credentials (API)
+
+**Problem:** Every signed URL call in `FirestoreStoryRepository._signed_url()`
+created a new `gcs.Client()`, called `google.auth.default()`, and refreshed
+credentials via a metadata server HTTP call. For N stories, that was 2N
+sequential round-trips to the metadata server.
+
+**Fix:** Create the GCS client and credentials once in `__init__` and reuse
+them. Token is only refreshed when expired.
+
+**File:** `apps/api/mello_api/repositories/firestore.py`
+**Impact:** -30% API server latency
+
+### 2. Keep one Cloud Run instance warm (Terraform)
+
+**Problem:** `min_instance_count = 0` meant the first request after idle hit a
+cold start: boot Python, initialize Firebase Admin SDK, create Firestore
+client, initialize all services. Cost: 500-1000ms.
+
+**Fix:** Set `min_instance_count = 1` in `cloudrun.tf`.
+
+**File:** `infra/terraform/cloudrun.tf`
+**Impact:** Eliminates cold start latency (~500-1000ms on first request)
+**Cost:** ~$5-10/month for a 1 vCPU / 512MB instance
+
+### 3. Firestore array-contains for topic filtering
+
+**Problem:** `find_many()` queried `where("isPublished", "==", True)`, streamed
+ALL published stories, then filtered by topic in Python. Downloaded all story
+data including storyText and segments just to throw most of it away.
+
+**Fix:** For single-topic queries (the common case), use Firestore's
+`array_contains` operator: `query.where("topics", "array_contains", topic)`.
+Firestore filters server-side, returning only matching documents.
+
+**File:** `apps/api/mello_api/repositories/firestore.py`
+**Impact:** Fewer documents transferred from Firestore
+
+### 4. Set authDomain to melostories.com
+
+**Problem:** Firebase Auth SDK used `melo-f5756.firebaseapp.com` as
+`authDomain`, causing a cross-origin iframe to load on every page:
+- 92KB `iframe.js` download from `firebaseapp.com`
+- CORS preflight + `getProjectConfig` call
+- ~300-400ms added to every page load
+
+**Fix:** Set `authDomain` to `melostories.com` (the app's own domain) per
+Firebase best practices. The auth iframe becomes same-origin, eliminating the
+cross-origin overhead. Also added `google_identity_platform_config` Terraform
+resource to manage authorized domains.
+
+**Files:** `apps/web/.env.example`, `infra/terraform/firebase.tf`, `scripts/deploy-web.sh`
+**Impact:** -300-400ms per page load, `firebaseapp.com` requests eliminated
+**Note:** Must also add `https://melostories.com/__/auth/handler` to Google
+OAuth client's authorized redirect URIs in Cloud Console (manual step).
+
+### 5. Use initializeAuth instead of getAuth
+
+**Problem:** `getAuth()` internally loads `browserPopupRedirectResolver` which
+opens a preemptive auth iframe on every page load — even pages that don't use
+popup sign-in. Firebase's own docs call this out as a performance issue.
+
+**Fix:** Switch to `initializeAuth()` with only persistence deps
+(`indexedDBLocalPersistence`, `browserLocalPersistence`). Lazy-load
+`browserPopupRedirectResolver` only in `signInWithGoogle()` via dynamic
+`import('firebase/auth')`.
+
+**Files:** `apps/web/src/lib/firebase.ts`, `apps/web/src/hooks/useAuth.ts`
+**Impact:** Auth iframe eliminated from all pages except sign-in. FCP dropped
+from 3,370ms to 1,696ms.
+
+### 6. Public GCS URLs for cover art
+
+**Problem:** The API generated a signed URL for each story's cover art using
+RSA crypto. For 12 stories, that was 12 `generate_signed_url()` calls adding
+server-side latency. Cover art for published stories isn't private — every
+authenticated user can see the same thumbnails.
+
+**Fix:** Grant `allUsers` `objectViewer` on the stories bucket (Terraform).
+Return direct public URLs (`storage.googleapis.com/bucket/path`) instead of
+signed URLs. Cover art signing eliminated entirely.
+
+**Files:** `infra/terraform/iam.tf`, `apps/api/mello_api/repositories/interfaces.py`,
+`apps/api/mello_api/repositories/firestore.py`, `apps/api/mello_api/routes/stories.py`
+**Impact:** -47% API server latency, -37% response size
+
+### 7. Public GCS URLs for audio
+
+**Problem:** After making cover art public, the remaining 12
+`generate_signed_url()` calls for audio were the last source of server-side
+crypto overhead. The bucket was already publicly readable (from fix 6).
+
+**Fix:** Add `get_audio_public_url()` to the repository interface. Switch the
+stories route to use public URLs for audio too.
+
+**Files:** Same as fix 6
+**Impact:** API server latency dropped from 719ms to 323ms. Response size from
+15,475 B to 6,493 B. Zero signed URL generation on the hot path.
+
+### 8. Static skeleton in HTML (LCP optimization)
+
+**Problem:** All pages were `'use client'` — the browser received empty HTML
+from the CDN, waited for JS to download and execute, then React mounted and
+showed content. LCP was 5.4s because cover art images couldn't load until
+after JS → auth → API call → render.
+
+**Fix:** Split every page into:
+- `page.tsx` — server component with `<Suspense fallback={<Skeleton />}>`
+- `*-content.tsx` — client component with data fetching
+
+The skeleton is baked into the static HTML at build time. The browser paints it
+immediately from the CDN response — before any JS loads. Lighthouse measures
+LCP against the skeleton (which is large enough to be the largest contentful
+paint) instead of a late-loading image.
+
+Also changed the `(app)/layout.tsx` to render children during auth loading
+instead of returning `null`.
+
+**Files:** All pages under `apps/web/src/app/`
+**Impact:** LCP dropped from 5,440ms to 2,917ms (-46%). Score jumped from 0.78
+to 0.91.
+
+**Pages with this pattern:**
+discover, stories, stories/length, player, favorites, history, create,
+search, voices, voice (recording), onboarding
+
+## What We Investigated But Didn't Change
+
+### Firebase `accounts:lookup` call (~480ms)
+The Firebase Auth SDK calls `identitytoolkit.googleapis.com/v1/accounts:lookup`
+on every page load to validate the persisted session. Firebase docs confirm
+this is by design — `onAuthStateChanged` and `authStateReady()` both wait for
+it. No recommended way to skip it. The ~480ms cost is the price of Firebase
+Auth with `local` persistence.
+
+### Server-side rendering
+The app uses Next.js static export → Firebase Hosting CDN. There is no server
+at request time. SSR would require moving to Cloud Run for the web app (or
+Firebase App Hosting). The static skeleton approach achieved most of the LCP
+benefit without changing the hosting model.
+
+### Font subsetting
+The 364KB Material Symbols Rounded font is the largest single asset. Subsetting
+to only the ~15 icons used would save ~340KB and improve FCP by ~100-200ms.
+Deferred — diminishing returns at 0.91 score.
+
+## Architecture Pattern
+
+Every page now follows:
+
+```
+page.tsx              → server component (runs at build time)
+                        exports default function with <Suspense fallback={<Skeleton />}>
+                        Skeleton HTML is baked into static .html file
+
+*-content.tsx         → 'use client' component
+                        data fetching, interactivity, auth
+                        hydrates inside Suspense boundary at runtime
+```
+
+The static HTML served by Firebase Hosting CDN contains the full skeleton
+layout. The browser paints it immediately. JS downloads in the background,
+React hydrates, auth resolves, API call fires, data replaces the skeleton.
