@@ -81,7 +81,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         return {
             "data": CreateInviteResponse(
                 token=token,
-                invite_url=f"{SITE_URL}/voice/{token}",
+                invite_url=f"{SITE_URL}/voice?token={token}",
                 expires_at=expires_at,
             ).model_dump(by_alias=True)
         }

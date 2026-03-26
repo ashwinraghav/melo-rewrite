@@ -83,7 +83,7 @@ def test_create_invite_returns_token(voice_client):
     data = r.json()["data"]
     assert "token" in data
     assert "inviteUrl" in data
-    assert data["inviteUrl"].startswith("https://melostories.com/voice/")
+    assert data["inviteUrl"].startswith("https://melostories.com/voice?token=")
     assert "expiresAt" in data
 
 

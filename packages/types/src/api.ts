@@ -91,6 +91,60 @@ export interface SearchResult extends StoryWithAudioUrl {
 // Response types (composed from domain types)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Voice types
+// ---------------------------------------------------------------------------
+
+export interface Voice {
+  id: string
+  name: string
+  relationship: string
+  elevenLabsVoiceId: string
+  status: 'processing' | 'ready' | 'failed'
+  sampleAudioPath: string
+  createdAt: string
+}
+
+export interface CreateInviteBody {
+  voiceName: string
+  relationship: string
+}
+
+export interface CreateInviteResponse {
+  token: string
+  inviteUrl: string
+  expiresAt: string
+}
+
+export interface InviteInfo {
+  voiceName: string
+  relationship: string
+  ownerDisplayName: string
+  status: 'pending' | 'used' | 'expired'
+}
+
+export interface ConvertStoryBody {
+  storyId: string
+  voiceId: string
+}
+
+export interface StoryConversion {
+  storyId: string
+  voiceId: string
+  voiceName: string
+  status: 'pending' | 'processing' | 'ready' | 'failed'
+  audioUrl?: string
+  audioPath: string
+  durationSeconds: number
+  segments: import('./story.js').StorySegment[]
+  createdAt: string
+  updatedAt: string
+}
+
+// ---------------------------------------------------------------------------
+// Story types
+// ---------------------------------------------------------------------------
+
 /** Story with a resolved, short-lived audio URL (not the raw Cloud Storage path). */
 export interface StoryWithAudioUrl {
   id: string

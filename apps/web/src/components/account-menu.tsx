@@ -14,6 +14,7 @@ import { useAuthContext } from '@/context/auth-context'
 import { Icon } from './icon'
 
 const MENU_ITEMS = [
+  { href: '/voices', label: 'Voices', icon: 'record_voice_over' },
   { href: '/favorites', label: 'Favorites', icon: 'favorite' },
   { href: '/history', label: 'History', icon: 'history' },
 ] as const
