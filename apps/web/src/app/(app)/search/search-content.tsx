@@ -13,6 +13,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useApiClient } from '@/hooks/useApiClient'
+import { useAuthContext } from '@/context/auth-context'
 import { Icon } from '@/components/icon'
 import type { SearchResult, PaginatedResponse } from '@mello/types'
 
@@ -20,6 +21,7 @@ export function SearchContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const client = useApiClient()
+  const { user } = useAuthContext()
 
   // The submitted query lives in the URL; the input is local state
   const activeQuery = searchParams.get('q') ?? ''
@@ -29,7 +31,7 @@ export function SearchContent() {
   const { data: searchResponse, isFetching } = useQuery({
     queryKey: ['search', activeQuery],
     queryFn: () => client.post<SearchResult[]>('/v1/search', { query: activeQuery, limit: 10 }),
-    enabled: !!activeQuery,
+    enabled: !!activeQuery && !!user,
     staleTime: 5 * 60 * 1000, // cache search results for 5 minutes
     retry: false,
   })
