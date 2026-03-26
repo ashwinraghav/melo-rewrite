@@ -49,7 +49,7 @@ class ElevenLabsPublisher(AudioPublisherService):
         self._voice_id = voice_id
         self._model_id = model_id
         self._bucket_name = bucket_name
-        self._gcp_project_id = gcp_project_id
+        self._gcs_client = gcs.Client(project=gcp_project_id)
 
     def _generate_with_timestamps(self, text: str, voice_id: str | None = None) -> dict:
         vid = voice_id or self._voice_id
@@ -125,8 +125,7 @@ class ElevenLabsPublisher(AudioPublisherService):
             import firebase_admin.storage as fb_storage
             bucket = fb_storage.bucket(bucket_name)
         else:
-            client = gcs.Client(project=self._gcp_project_id)
-            bucket = client.bucket(bucket_name)
+            bucket = self._gcs_client.bucket(bucket_name)
         blob = bucket.blob(gcs_path)
         blob.upload_from_string(audio_bytes, content_type="audio/mpeg")
         return gcs_path

@@ -67,11 +67,10 @@ class CatalogPublisherService(ABC):
 class GcsCatalogPublisher(CatalogPublisherService):
     def __init__(self, bucket_name: str, gcp_project_id: str) -> None:
         self._bucket_name = bucket_name
-        self._gcp_project_id = gcp_project_id
+        self._gcs_client = gcs.Client(project=gcp_project_id)
 
     def _upload_json(self, path: str, data: dict | list) -> None:
-        client = gcs.Client(project=self._gcp_project_id)
-        bucket = client.bucket(self._bucket_name)
+        bucket = self._gcs_client.bucket(self._bucket_name)
         blob = bucket.blob(path)
         blob.upload_from_string(
             json.dumps(data, separators=(",", ":")),

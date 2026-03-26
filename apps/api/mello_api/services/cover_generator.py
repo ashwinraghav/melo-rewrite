@@ -72,7 +72,7 @@ class VertexCoverGenerator(CoverGeneratorService):
             vertexai=True, project=gcp_project_id, location=gcp_location
         )
         self._bucket_name = bucket_name
-        self._gcp_project_id = gcp_project_id
+        self._gcs_client = gcs.Client(project=gcp_project_id)
 
     def generate_and_upload(
         self, story_id: str, title: str, description: str, topics: list[str]
@@ -112,8 +112,7 @@ class VertexCoverGenerator(CoverGeneratorService):
         image.save(buf, "WEBP", quality=85)
         buf.seek(0)
 
-        client = gcs.Client(project=self._gcp_project_id)
-        bucket = client.bucket(self._bucket_name)
+        bucket = self._gcs_client.bucket(self._bucket_name)
         blob = bucket.blob(gcs_path)
         blob.upload_from_file(buf, content_type="image/webp")
 
