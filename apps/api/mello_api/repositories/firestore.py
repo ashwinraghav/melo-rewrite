@@ -186,14 +186,19 @@ class FirestoreStoryRepository(StoryRepository):
             distance_result_field="vector_distance",
         )
 
+        import logging
+        log = logging.getLogger(__name__)
+
         results = []
         for doc in vector_query.stream():
-            story = _story_from_doc(doc.id, doc.to_dict())
-            # Cosine distance: 0 = identical, 2 = opposite. Convert to similarity: 1 - distance.
-            distance = doc.to_dict().get("vector_distance", 1.0)
+            data = doc.to_dict()
+            story = _story_from_doc(doc.id, data)
+            distance = data.get("vector_distance", 1.0)
             similarity = 1.0 - distance
+            log.info("vector_search hit: %s distance=%s sim=%s", doc.id, distance, similarity)
             results.append((story, similarity))
 
+        log.info("vector_search: %d results for %d-dim query", len(results), len(query_embedding))
         return results
 
     def _signed_url(self, path: str) -> str:
