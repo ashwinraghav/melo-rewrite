@@ -15,7 +15,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useApiClient } from '@/hooks/useApiClient'
 import { AudioPlayer } from '@/components/audio-player'
 import { ReadAlong } from '@/components/read-along'
-import { VoiceSwitcher } from '@/components/voice-switcher'
+import { PersonalizeSheet } from '@/components/personalize-sheet'
 import { Icon } from '@/components/icon'
 import type { StoryWithAudioUrl, PaginatedResponse, StorySegment } from '@mello/types'
 import { COMPLETION_THRESHOLD } from '@mello/types'
@@ -65,16 +65,20 @@ function PlayerPage() {
   const [currentTime, setCurrentTime] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
 
-  // Voice switcher state
+  // Voice personalization state
+  const [showPersonalize, setShowPersonalize] = useState(false)
   const [activeVoiceId, setActiveVoiceId] = useState<string | null>(null)
+  const [activeVoiceName, setActiveVoiceName] = useState<string | null>(null)
   const [overrideAudioUrl, setOverrideAudioUrl] = useState<string | null>(null)
   const [overrideSegments, setOverrideSegments] = useState<StorySegment[] | null>(null)
 
   const handleVoiceChange = useCallback(
-    (voiceId: string | null, audioUrl: string, segments: StorySegment[]) => {
+    (voiceId: string | null, voiceName: string | null, audioUrl: string, segments: StorySegment[]) => {
       setActiveVoiceId(voiceId)
+      setActiveVoiceName(voiceId ? voiceName : null)
       setOverrideAudioUrl(voiceId ? audioUrl : null)
       setOverrideSegments(voiceId ? segments : null)
+      setShowPersonalize(false)
     },
     [],
   )
@@ -150,6 +154,7 @@ function PlayerPage() {
     setCurrentId(storyId)
     // Reset voice override on track change
     setActiveVoiceId(null)
+    setActiveVoiceName(null)
     setOverrideAudioUrl(null)
     setOverrideSegments(null)
   }, [])
@@ -245,16 +250,14 @@ function PlayerPage() {
           </h1>
           <p className="mt-1 text-sm text-on-surface-variant">{story.description}</p>
 
-          {/* Voice switcher */}
-          <div className="mt-3">
-            <VoiceSwitcher
-              storyId={currentId}
-              originalAudioUrl={story.audioUrl}
-              originalSegments={story.segments ?? []}
-              activeVoiceId={activeVoiceId}
-              onVoiceChange={handleVoiceChange}
-            />
-          </div>
+          {/* Personalize button — only shows if user has voices */}
+          <button
+            onClick={() => setShowPersonalize(true)}
+            className="mt-3 flex items-center gap-1.5 rounded-full bg-surface-container-high/60 px-3 py-1.5 font-body text-xs text-on-surface-variant transition-all hover:bg-surface-container-highest/60"
+          >
+            <Icon name="record_voice_over" size={14} />
+            {activeVoiceName ? `Narrated by ${activeVoiceName}` : 'Personalize voice'}
+          </button>
         </motion.div>
       </AnimatePresence>
 
@@ -315,6 +318,17 @@ function PlayerPage() {
           onEnded={handleEnded}
         />
       </div>
+
+      {/* Personalize bottom sheet */}
+      <PersonalizeSheet
+        open={showPersonalize}
+        onClose={() => setShowPersonalize(false)}
+        storyId={currentId}
+        originalAudioUrl={story.audioUrl}
+        originalSegments={story.segments ?? []}
+        activeVoiceId={activeVoiceId}
+        onVoiceChange={handleVoiceChange}
+      />
     </div>
   )
 }
