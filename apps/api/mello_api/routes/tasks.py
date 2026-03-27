@@ -15,14 +15,24 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from opentelemetry import trace
 from pydantic import BaseModel
 
+from ..metrics import (
+    stories_generated,
+    stories_published,
+    story_generation_duration,
+    story_publish_duration,
+    voice_clones_completed,
+)
 from ..models.story import StoryFilters, categorize_duration
 from ..repositories.interfaces import Repositories, Services
 
 log = logging.getLogger(__name__)
+tracer = trace.get_tracer(__name__)
 
 
 # ── Request bodies ──────────────────────────────────────────────────────────
@@ -86,6 +96,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         body: GenerateStoryTask,
         _auth: None = Depends(_verify_internal_request),
     ):
+        t0 = time.monotonic()
         try:
             generated = await services.story_generator.generate(body.prompt)
 
@@ -101,6 +112,8 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
                 "generate_error": "",
             })
 
+            story_generation_duration.record(time.monotonic() - t0)
+            stories_generated.add(1)
             log.info("generate-story completed for %s", body.storyId)
             return {"status": "ok"}
 
@@ -122,36 +135,43 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
             log.error("publish-story: story %s not found", body.storyId)
             return {"status": "error", "detail": "Story not found"}
 
+        t0 = time.monotonic()
         try:
-            await repos.stories.update(body.storyId, {"publish_step": "generating_audio"})
-            audio_result = await services.audio_publisher.publish(body.storyId, story.story_text)
+            with tracer.start_as_current_span("publish.generate_audio"):
+                await repos.stories.update(body.storyId, {"publish_step": "generating_audio"})
+                audio_result = await services.audio_publisher.publish(body.storyId, story.story_text)
 
-            await repos.stories.update(body.storyId, {"publish_step": "creating_cover"})
-            cover_path = await services.cover_generator.generate_and_upload(
-                body.storyId, story.title, story.description, story.topics
-            )
+            with tracer.start_as_current_span("publish.create_cover"):
+                await repos.stories.update(body.storyId, {"publish_step": "creating_cover"})
+                cover_path = await services.cover_generator.generate_and_upload(
+                    body.storyId, story.title, story.description, story.topics
+                )
 
-            await repos.stories.update(body.storyId, {"publish_step": "generating_embedding"})
-            embedding = await services.embedding.embed_story(story)
+            with tracer.start_as_current_span("publish.generate_embedding"):
+                await repos.stories.update(body.storyId, {"publish_step": "generating_embedding"})
+                embedding = await services.embedding.embed_story(story)
 
-            await repos.stories.update(body.storyId, {"publish_step": "finalizing"})
-            await repos.stories.update(body.storyId, {
-                "audio_path": audio_result.audio_path,
-                "cover_art_path": cover_path,
-                "duration_seconds": audio_result.duration_seconds,
-                "duration_category": categorize_duration(audio_result.duration_seconds),
-                "segments": audio_result.segments,
-                "embedding": embedding,
-                "is_published": True,
-                "publish_status": "ready",
-                "publish_step": "",
-                "publish_error": "",
-            })
+            with tracer.start_as_current_span("publish.finalize"):
+                await repos.stories.update(body.storyId, {"publish_step": "finalizing"})
+                await repos.stories.update(body.storyId, {
+                    "audio_path": audio_result.audio_path,
+                    "cover_art_path": cover_path,
+                    "duration_seconds": audio_result.duration_seconds,
+                    "duration_category": categorize_duration(audio_result.duration_seconds),
+                    "segments": audio_result.segments,
+                    "embedding": embedding,
+                    "is_published": True,
+                    "publish_status": "ready",
+                    "publish_step": "",
+                    "publish_error": "",
+                })
 
-            services.search.invalidate()
-            all_stories = await repos.stories.find_many(StoryFilters())
-            await services.catalog_publisher.publish_catalog(all_stories)
+                services.search.invalidate()
+                all_stories = await repos.stories.find_many(StoryFilters())
+                await services.catalog_publisher.publish_catalog(all_stories)
 
+            story_publish_duration.record(time.monotonic() - t0)
+            stories_published.add(1)
             log.info("publish-story completed for %s", body.storyId)
             return {"status": "ok"}
 
@@ -178,6 +198,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
                 "status": "ready",
             })
 
+            voice_clones_completed.add(1)
             log.info("clone-voice completed for voice %s", body.voiceId)
             return {"status": "ok"}
 

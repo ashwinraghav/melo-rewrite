@@ -13,6 +13,7 @@ from ..models.story import (
     Story,
     StoryWithAudioUrl,
 )
+from ..metrics import searches_performed
 from ..repositories.interfaces import Repositories, Services
 
 
@@ -48,6 +49,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         body: SearchStoriesRequest,
         _user: AuthenticatedUser = Depends(get_current_user),
     ):
+        searches_performed.add(1)
         results = await services.search.search(
             query=body.query,
             story_repo=repos.stories,

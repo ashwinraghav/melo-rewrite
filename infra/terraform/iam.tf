@@ -84,6 +84,22 @@ resource "google_project_iam_member" "api_cloud_tasks_sa_user" {
   member  = "serviceAccount:${google_service_account.api.email}"
 }
 
+# ── Observability (Cloud Trace + Cloud Monitoring) ───────────────────────────
+
+# The API writes distributed traces to Cloud Trace via OpenTelemetry.
+resource "google_project_iam_member" "api_trace_agent" {
+  project = var.project_id
+  role    = "roles/cloudtrace.agent"
+  member  = "serviceAccount:${google_service_account.api.email}"
+}
+
+# The API writes custom business metrics to Cloud Monitoring via OpenTelemetry.
+resource "google_project_iam_member" "api_metric_writer" {
+  project = var.project_id
+  role    = "roles/monitoring.metricWriter"
+  member  = "serviceAccount:${google_service_account.api.email}"
+}
+
 # ── Cloud Run invoker (public access) ─────────────────────────────────────────
 
 # Both services are publicly accessible — users hit them directly from the browser.

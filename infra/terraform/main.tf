@@ -23,6 +23,8 @@ locals {
     "firebasestorage.googleapis.com",  # Firebase Storage (voice recordings)
     "compute.googleapis.com",          # Cloud CDN + Load Balancer
     "cloudtasks.googleapis.com",       # Cloud Tasks (background jobs)
+    "cloudtrace.googleapis.com",       # Cloud Trace (distributed tracing)
+    "monitoring.googleapis.com",       # Cloud Monitoring (metrics + dashboards)
   ]
 }
 

@@ -1,25 +1,33 @@
 """
 Production ASGI entry point: uvicorn mello_api.asgi:app
-Initialises Firebase and creates the FastAPI app with Firestore repositories.
+Initialises logging, OpenTelemetry, Sentry, Firebase, and creates the FastAPI app.
 """
 import asyncio
 import logging
-import sentry_sdk
-import firebase_admin
+
 from .config import config
 
-# Sentry — must be initialised before the FastAPI app is created.
-# The FastAPI integration is auto-discovered; no middleware needed.
+# 1. Structured logging — must be first, before any getLogger() calls.
+from .logging_config import configure_logging
+configure_logging()
+
+# 2. OpenTelemetry — must be before Sentry and create_app so auto-instrumentors
+#    can hook into FastAPI's constructor and httpx/gRPC clients.
+from .telemetry import init_telemetry
+init_telemetry()
+
+# 3. Sentry — error capture only. traces_sample_rate=0 because OTel handles tracing.
+import sentry_sdk
 if config.sentry_dsn:
     sentry_sdk.init(
         dsn=config.sentry_dsn,
         environment=config.env,
-        traces_sample_rate=0.1,
+        traces_sample_rate=0.0,
         send_default_pii=False,
-        before_send_transaction=lambda event, _hint: (
-            None if event.get("transaction") == "/health" else event
-        ),
     )
+
+# 4. Firebase + services + app (unchanged)
+import firebase_admin
 from .main import create_app
 from .repositories.firestore import create_firestore_repositories
 from .repositories.interfaces import Services
@@ -87,7 +95,6 @@ if config.anthropic_api_key and config.elevenlabs_api_key:
 app = create_app(repos=repos, services=services, cors_origins=config.cors_origins)
 
 # Enable asyncio debug mode to detect blocking calls on the event loop.
-# Logs a warning with traceback when a callback takes longer than 100ms.
 log = logging.getLogger("mello_api.async_guard")
 try:
     loop = asyncio.get_event_loop()
