@@ -37,7 +37,7 @@ def init_telemetry() -> None:
     from opentelemetry.propagators.cloud_trace_propagator import (
         CloudTraceFormatPropagator,
     )
-    from opentelemetry.trace.propagation import TraceContextTextMapPropagator
+    from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
     # Auto-instrumentors
     from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
