@@ -74,7 +74,7 @@ def init_telemetry() -> None:
     ]))
 
     # ── Auto-instrumentation ──────────────────────────────────────────────
-    FastAPIInstrumentor.instrument(excluded_urls="health")
+    FastAPIInstrumentor().instrument(excluded_urls="health")
     HTTPXClientInstrumentor().instrument()
     GrpcInstrumentorClient().instrument()
     LoggingInstrumentor().instrument(set_logging_format=False)
