@@ -6,6 +6,9 @@
  *   - `loading`     True while the auth state is being determined
  *   - `idToken`     A function that returns a fresh ID token (for API calls)
  *   - `signInWithGoogle`
+ *   - `signInWithFacebook`
+ *   - `signInWithEmail`
+ *   - `createAccountWithEmail`
  *   - `signOut`
  *
  * The hook does NOT redirect — that is the responsibility of the layout
@@ -27,6 +30,9 @@ export interface AuthState {
   loading: boolean
   getIdToken: () => Promise<string | null>
   signInWithGoogle: () => Promise<void>
+  signInWithFacebook: () => Promise<void>
+  signInWithEmail: (email: string, password: string) => Promise<void>
+  createAccountWithEmail: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -56,9 +62,45 @@ export function useAuth(): AuthState {
     await signInWithPopup(auth, provider, browserPopupRedirectResolver)
   }, [])
 
+  const signInWithFacebook = useCallback(async (): Promise<void> => {
+    const { signInWithPopup, FacebookAuthProvider, browserPopupRedirectResolver } =
+      await import('firebase/auth')
+    const provider = new FacebookAuthProvider()
+    provider.setCustomParameters({ auth_type: 'rerequest' })
+    // Only request public_profile — the email scope requires explicit
+    // approval in the Facebook Developer Console (App Review → Permissions).
+    provider.addScope('public_profile')
+    await signInWithPopup(auth, provider, browserPopupRedirectResolver)
+  }, [])
+
+  const signInWithEmail = useCallback(
+    async (email: string, password: string): Promise<void> => {
+      const { signInWithEmailAndPassword } = await import('firebase/auth')
+      await signInWithEmailAndPassword(auth, email, password)
+    },
+    [],
+  )
+
+  const createAccountWithEmail = useCallback(
+    async (email: string, password: string): Promise<void> => {
+      const { createUserWithEmailAndPassword } = await import('firebase/auth')
+      await createUserWithEmailAndPassword(auth, email, password)
+    },
+    [],
+  )
+
   const signOut = useCallback(async (): Promise<void> => {
     await firebaseSignOut(auth)
   }, [])
 
-  return { user, loading, getIdToken, signInWithGoogle, signOut }
+  return {
+    user,
+    loading,
+    getIdToken,
+    signInWithGoogle,
+    signInWithFacebook,
+    signInWithEmail,
+    createAccountWithEmail,
+    signOut,
+  }
 }

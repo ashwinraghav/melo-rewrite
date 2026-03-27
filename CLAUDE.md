@@ -103,6 +103,18 @@ From the Stitch project "Editorial Serenity" (project ID 13037681786636023062).
 - Ambient shadows: 32px blur, 6% opacity, tinted `on-surface`
 - Ghost borders only: `outline-variant` at 15% opacity max
 
+## Error monitoring (Sentry)
+
+**Dashboard:** https://spectrum-bridge.sentry.io/issues/
+**Org:** `spectrum-bridge` | **Project:** `javascript-nextjs`
+
+- **Frontend** (`@sentry/nextjs`): client-side error capture, session replay, `global-error.tsx` boundary.
+  Config in `apps/web/src/instrumentation-client.ts`.
+- **Backend** (`sentry-sdk[fastapi]`): auto-captures unhandled route errors.
+  Init in `apps/api/mello_api/asgi.py`.
+- DSN is a public identifier, not a secret. No Sentry secrets in Secret Manager.
+- Source map uploads use `SENTRY_AUTH_TOKEN` (build-time only, local `.env.local`).
+
 ## Infrastructure
 
 **ALL infrastructure changes MUST go through Terraform.** No exceptions.

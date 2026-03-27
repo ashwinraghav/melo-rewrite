@@ -39,12 +39,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${plusJakarta.variable} ${lexend.variable}`}>
       <head>
         {/* Preconnect to CDN and API so browsers warm connections early */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://cdn.melostories.com" />
         <link rel="preconnect" href="https://mello-api-rhp2tqs5qa-uc.a.run.app" />
         {/* Material Symbols Rounded — used throughout the Stitch Editorial Serenity design */}
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=block"
         />
       </head>
       <body>

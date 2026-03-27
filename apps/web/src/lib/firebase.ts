@@ -37,6 +37,11 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0
 // resolver eagerly. This prevents Firebase from opening a preemptive iframe
 // on every page load — only the sign-in page passes the resolver explicitly.
 // See: https://firebase.google.com/docs/auth/web/custom-dependencies
+// getAuth is tree-shakeable when imported statically from 'firebase/auth'.
+// We need it as a fallback when initializeAuth throws (Next.js HMR calls this
+// module twice). Previously this used require() which bypasses tree-shaking.
+import { getAuth } from 'firebase/auth'
+
 let auth: Auth
 try {
   auth = initializeAuth(app, {
@@ -45,7 +50,6 @@ try {
 } catch {
   // initializeAuth throws if called twice (e.g. Next.js HMR). Fall back to
   // the already-initialised instance via getAuth.
-  const { getAuth } = require('firebase/auth') as typeof import('firebase/auth')
   auth = getAuth(app)
 }
 export { auth }
