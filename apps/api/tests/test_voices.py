@@ -1,7 +1,10 @@
 """
 Voice feature tests — invites, recording, voice management, and story conversion.
 """
+import asyncio
 import pytest
+import httpx
+from httpx import ASGITransport
 from fastapi.testclient import TestClient
 from mello_api.main import create_app
 from mello_api.repositories.interfaces import Services
@@ -19,17 +22,21 @@ from tests.fixtures import STORIES
 from tests.conftest import auth
 
 
+async def _noop_handler(task_type: str, payload: dict) -> None:
+    pass
+
+
 @pytest.fixture
 def voice_client():
     repos = create_memory_repositories()
     assert isinstance(repos.stories, MemoryStoryRepository)
     repos.stories.seed(STORIES)
-    # Create a user profile for invite owner name lookup
-    repos.users.create(UserProfile(
+    # Create a user profile for invite owner name lookup — use asyncio.run for async repo
+    asyncio.run(repos.users.create(UserProfile(
         uid="user-1", email="ash@example.com", display_name="Ash",
         child_age=4, preferred_topics=["park"], created_at="2024-01-01T00:00:00Z",
         updated_at="2024-01-01T00:00:00Z",
-    ))
+    )))
     embedding = MockEmbeddingService()
     services = Services(
         story_generator=MockStoryGenerator(),
@@ -39,19 +46,21 @@ def voice_client():
         search=SearchService(embedding_service=embedding),
         voice_cloner=MockVoiceCloner(),
         catalog_publisher=MockCatalogPublisher(),
-        task_queue=SyncTaskQueue(handler=lambda t, p: None),  # placeholder
+        task_queue=SyncTaskQueue(handler=_noop_handler),
     )
     app = create_app(repos=repos, services=services)
-    test_client = TestClient(app)
 
-    # Wire up SyncTaskQueue to dispatch tasks via the internal endpoint
-    def _dispatch(task_type: str, payload: dict) -> None:
-        resp = test_client.post(f"/internal/tasks/{task_type}", json=payload)
+    # Use httpx.AsyncClient with ASGITransport for internal task dispatch
+    transport = ASGITransport(app=app)
+    async_client = httpx.AsyncClient(transport=transport, base_url="http://test")
+
+    async def _dispatch(task_type: str, payload: dict) -> None:
+        resp = await async_client.post(f"/internal/tasks/{task_type}", json=payload)
         assert resp.status_code == 200, f"Task {task_type} failed: {resp.text}"
 
     services.task_queue._handler = _dispatch
 
-    return test_client
+    return TestClient(app)
 
 
 FAKE_AUDIO = b"\x00" * 100_000  # 100KB — well over the 50KB minimum

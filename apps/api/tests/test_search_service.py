@@ -1,7 +1,7 @@
 """Unit tests for SearchService with Firestore vector search."""
 import math
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from mello_api.services.search import SearchService
 from mello_api.services.embedding import MockEmbeddingService
@@ -34,7 +34,7 @@ def _make_story(id: str, themes: str = "test", **kwargs) -> Story:
     defaults.update(kwargs)
     story = Story(**defaults)
     if themes:
-        story.embedding = _EMB.embed_story(story)
+        story.embedding = _EMB.embed_story_sync(story)
     return story
 
 
@@ -55,38 +55,44 @@ class TestSearchService:
         ]
         self.repo = _make_repo(self.stories)
 
-    def test_search_returns_results(self):
-        results = self.service.search("bedtime", self.repo)
+    @pytest.mark.anyio
+    async def test_search_returns_results(self):
+        results = await self.service.search("bedtime", self.repo)
         assert len(results) > 0
         assert all(isinstance(r[1], float) for r in results)
 
-    def test_search_filters_unpublished(self):
+    @pytest.mark.anyio
+    async def test_search_filters_unpublished(self):
         stories = self.stories + [_make_story("unpub", is_published=False)]
         repo = _make_repo(stories)
-        results = self.service.search("bedtime", repo)
+        results = await self.service.search("bedtime", repo)
         ids = [s.id for s, _ in results]
         assert "unpub" not in ids
 
-    def test_search_filters_by_child_age(self):
+    @pytest.mark.anyio
+    async def test_search_filters_by_child_age(self):
         stories = [
             _make_story("young", age_min=2, age_max=4),
             _make_story("old", age_min=8, age_max=12),
         ]
         repo = _make_repo(stories)
-        results = self.service.search("bedtime", repo, child_age=3)
+        results = await self.service.search("bedtime", repo, child_age=3)
         ids = [s.id for s, _ in results]
         assert "young" in ids
         assert "old" not in ids
 
-    def test_search_respects_limit(self):
-        results = self.service.search("stories", self.repo, limit=1)
+    @pytest.mark.anyio
+    async def test_search_respects_limit(self):
+        results = await self.service.search("stories", self.repo, limit=1)
         assert len(results) <= 1
 
-    def test_search_no_eligible_stories_returns_empty(self):
-        results = self.service.search("bedtime", self.repo, child_age=99)
+    @pytest.mark.anyio
+    async def test_search_no_eligible_stories_returns_empty(self):
+        results = await self.service.search("bedtime", self.repo, child_age=99)
         assert results == []
 
-    def test_search_stories_without_embedding_excluded(self):
+    @pytest.mark.anyio
+    async def test_search_stories_without_embedding_excluded(self):
         no_emb = Story(
             id="no-emb", title="No Embedding", description="test",
             duration_seconds=60, duration_category="short",
@@ -95,7 +101,7 @@ class TestSearchService:
             is_published=True, created_at=_NOW, updated_at=_NOW,
         )
         repo = _make_repo([no_emb])
-        results = self.service.search("test", repo)
+        results = await self.service.search("test", repo)
         assert results == []
 
     def test_load_embeddings_is_noop(self):
@@ -119,9 +125,10 @@ class TestSearchServiceCohere:
         self.repo = _make_repo(self.stories)
 
     @patch("mello_api.services.search.cohere")
-    def test_cohere_rerank_called_when_key_present(self, mock_cohere_module):
-        mock_client = MagicMock()
-        mock_cohere_module.ClientV2.return_value = mock_client
+    @pytest.mark.anyio
+    async def test_cohere_rerank_called_when_key_present(self, mock_cohere_module):
+        mock_client = AsyncMock()
+        mock_cohere_module.AsyncClientV2.return_value = mock_client
 
         mock_result = MagicMock()
         mock_result.index = 0
@@ -134,23 +141,24 @@ class TestSearchServiceCohere:
             embedding_service=self.embedding,
             cohere_api_key="test-key",
         )
-        results = service.search("bedtime", self.repo, limit=1)
+        results = await service.search("bedtime", self.repo, limit=1)
 
         mock_client.rerank.assert_called_once()
         assert len(results) == 1
         assert results[0][1] == 0.95
 
     @patch("mello_api.services.search.cohere")
-    def test_cohere_failure_falls_back_to_vector_search(self, mock_cohere_module):
-        mock_client = MagicMock()
-        mock_cohere_module.ClientV2.return_value = mock_client
+    @pytest.mark.anyio
+    async def test_cohere_failure_falls_back_to_vector_search(self, mock_cohere_module):
+        mock_client = AsyncMock()
+        mock_cohere_module.AsyncClientV2.return_value = mock_client
         mock_client.rerank.side_effect = RuntimeError("Cohere API down")
 
         service = SearchService(
             embedding_service=self.embedding,
             cohere_api_key="test-key",
         )
-        results = service.search("bedtime", self.repo)
+        results = await service.search("bedtime", self.repo)
 
         assert len(results) > 0
         assert all(-1.0 <= score <= 1.0 for _, score in results)

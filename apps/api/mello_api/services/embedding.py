@@ -21,12 +21,12 @@ EMBEDDING_MODEL = "text-embedding-005"
 
 class EmbeddingService(ABC):
     @abstractmethod
-    def embed_text(self, text: str) -> list[float]: ...
+    async def embed_text(self, text: str) -> list[float]: ...
 
-    def embed_story(self, story: "Story") -> list[float]:
+    async def embed_story(self, story: "Story") -> list[float]:
         """Build composite text from story themes and embed it."""
         text = f"{story.title}. {story.description}. {story.themes}"
-        return self.embed_text(text)
+        return await self.embed_text(text)
 
 
 class VertexEmbeddingService(EmbeddingService):
@@ -35,8 +35,8 @@ class VertexEmbeddingService(EmbeddingService):
             vertexai=True, project=gcp_project_id, location=gcp_location
         )
 
-    def embed_text(self, text: str) -> list[float]:
-        response = self._client.models.embed_content(
+    async def embed_text(self, text: str) -> list[float]:
+        response = await self._client.aio.models.embed_content(
             model=EMBEDDING_MODEL,
             contents=text,
         )
@@ -48,7 +48,11 @@ class MockEmbeddingService(EmbeddingService):
 
     DIMS = 768
 
-    def embed_text(self, text: str) -> list[float]:
+    async def embed_text(self, text: str) -> list[float]:
+        return self._embed_text_sync(text)
+
+    def _embed_text_sync(self, text: str) -> list[float]:
+        """Synchronous embedding for use at module-level in test fixtures."""
         h = hashlib.sha256(text.encode()).digest()
         # Expand hash to fill 768 floats deterministically
         result: list[float] = []
@@ -62,3 +66,8 @@ class MockEmbeddingService(EmbeddingService):
         if mag > 0:
             result = [x / mag for x in result]
         return result
+
+    def embed_story_sync(self, story: "Story") -> list[float]:
+        """Synchronous embed for use at module-level in test fixtures."""
+        text = f"{story.title}. {story.description}. {story.themes}"
+        return self._embed_text_sync(text)

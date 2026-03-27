@@ -2,6 +2,8 @@
 Production ASGI entry point: uvicorn mello_api.asgi:app
 Initialises Firebase and creates the FastAPI app with Firestore repositories.
 """
+import asyncio
+import logging
 import sentry_sdk
 import firebase_admin
 from .config import config
@@ -83,3 +85,14 @@ if config.anthropic_api_key and config.elevenlabs_api_key:
     )
 
 app = create_app(repos=repos, services=services, cors_origins=config.cors_origins)
+
+# Enable asyncio debug mode to detect blocking calls on the event loop.
+# Logs a warning with traceback when a callback takes longer than 100ms.
+log = logging.getLogger("mello_api.async_guard")
+try:
+    loop = asyncio.get_event_loop()
+    loop.set_debug(True)
+    loop.slow_callback_duration = 0.1  # 100ms
+    log.info("asyncio debug mode enabled (slow_callback_duration=100ms)")
+except RuntimeError:
+    pass  # No event loop yet — uvicorn will create one

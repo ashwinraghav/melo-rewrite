@@ -6,9 +6,9 @@ ABC interface + production (Vertex AI) and test (mock) implementations.
 """
 from __future__ import annotations
 
+import asyncio
 import io
 import logging
-import time
 from abc import ABC, abstractmethod
 
 from google import genai
@@ -59,7 +59,7 @@ def build_cover_prompt(title: str, description: str, topics: list[str]) -> str:
 
 class CoverGeneratorService(ABC):
     @abstractmethod
-    def generate_and_upload(
+    async def generate_and_upload(
         self, story_id: str, title: str, description: str, topics: list[str]
     ) -> str:
         """Generate cover art and upload to GCS. Returns the GCS path."""
@@ -74,7 +74,7 @@ class VertexCoverGenerator(CoverGeneratorService):
         self._bucket_name = bucket_name
         self._gcs_client = gcs.Client(project=gcp_project_id)
 
-    def generate_and_upload(
+    async def generate_and_upload(
         self, story_id: str, title: str, description: str, topics: list[str]
     ) -> str:
         prompt = build_cover_prompt(title, description, topics)
@@ -84,7 +84,7 @@ class VertexCoverGenerator(CoverGeneratorService):
         image_data = None
         for attempt in range(MAX_RETRIES):
             try:
-                response = self._client.models.generate_images(
+                response = await self._client.aio.models.generate_images(
                     model=MODEL,
                     prompt=prompt,
                     config=types.GenerateImagesConfig(
@@ -99,7 +99,7 @@ class VertexCoverGenerator(CoverGeneratorService):
             except Exception as e:
                 log.warning("Imagen error (attempt %d/%d): %s", attempt + 1, MAX_RETRIES, e)
             if attempt < MAX_RETRIES - 1:
-                time.sleep(2)
+                await asyncio.sleep(2)
 
         if image_data is None:
             log.warning("Cover art generation failed after %d attempts, publishing without cover", MAX_RETRIES)
@@ -114,7 +114,7 @@ class VertexCoverGenerator(CoverGeneratorService):
 
         bucket = self._gcs_client.bucket(self._bucket_name)
         blob = bucket.blob(gcs_path)
-        blob.upload_from_file(buf, content_type="image/webp")
+        await asyncio.to_thread(blob.upload_from_file, buf, "image/webp")
 
         return gcs_path
 
@@ -122,7 +122,7 @@ class VertexCoverGenerator(CoverGeneratorService):
 class MockCoverGenerator(CoverGeneratorService):
     """Returns a canned GCS path for tests — no API calls."""
 
-    def generate_and_upload(
+    async def generate_and_upload(
         self, story_id: str, title: str, description: str, topics: list[str]
     ) -> str:
         return f"stories/{story_id}/cover.webp"

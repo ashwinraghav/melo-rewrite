@@ -2,6 +2,7 @@
 App factory. Import `create_app` in tests; use `asgi.py` as the uvicorn entry point.
 """
 from __future__ import annotations
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .repositories.interfaces import Repositories, Services
@@ -19,7 +20,21 @@ def create_app(
     services: Services | None = None,
     cors_origins: list[str] | None = None,
 ) -> FastAPI:
-    app = FastAPI(title="Mello API", version="0.0.1", docs_url=None, redoc_url=None)
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        yield
+        # Close httpx async clients on shutdown
+        if services:
+            for svc in [services.audio_publisher, services.voice_cloner]:
+                client = getattr(svc, '_client', None)
+                if client and hasattr(client, 'aclose'):
+                    await client.aclose()
+
+    app = FastAPI(
+        title="Mello API", version="0.0.1",
+        docs_url=None, redoc_url=None,
+        lifespan=lifespan,
+    )
 
     app.add_middleware(
         CORSMiddleware,

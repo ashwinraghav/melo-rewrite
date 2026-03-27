@@ -2,14 +2,14 @@
 Cloud Tasks queue — enqueues background work targeting the same Cloud Run service.
 
 Production: creates HTTP tasks with OIDC authentication.
-Tests: SyncTaskQueue runs the handler synchronously for deterministic assertions.
+Tests: SyncTaskQueue runs the handler asynchronously for deterministic assertions.
 """
 from __future__ import annotations
 
 import json
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Awaitable, Callable
 
 if TYPE_CHECKING:
     pass
@@ -19,7 +19,7 @@ log = logging.getLogger(__name__)
 
 class TaskQueueService(ABC):
     @abstractmethod
-    def enqueue(self, task_type: str, payload: dict, dedup_id: str | None = None) -> None: ...
+    async def enqueue(self, task_type: str, payload: dict, dedup_id: str | None = None) -> None: ...
 
 
 class CloudTaskQueue(TaskQueueService):
@@ -35,12 +35,12 @@ class CloudTaskQueue(TaskQueueService):
     ) -> None:
         from google.cloud import tasks_v2
 
-        self._client = tasks_v2.CloudTasksClient()
+        self._client = tasks_v2.CloudTasksAsyncClient()
         self._queue_path = self._client.queue_path(project_id, location, queue_name)
         self._service_url = service_url.rstrip("/")
         self._service_account_email = service_account_email
 
-    def enqueue(self, task_type: str, payload: dict, dedup_id: str | None = None) -> None:
+    async def enqueue(self, task_type: str, payload: dict, dedup_id: str | None = None) -> None:
         from google.cloud import tasks_v2
 
         client = self._client
@@ -63,7 +63,7 @@ class CloudTaskQueue(TaskQueueService):
             task["name"] = f"{self._queue_path}/tasks/{task_type}-{dedup_id}"
 
         try:
-            client.create_task(
+            await client.create_task(
                 request={"parent": self._queue_path, "task": task},
             )
             log.info("Enqueued task %s (dedup=%s)", task_type, dedup_id)
@@ -76,10 +76,10 @@ class CloudTaskQueue(TaskQueueService):
 
 
 class SyncTaskQueue(TaskQueueService):
-    """Runs task handlers synchronously — for deterministic tests."""
+    """Runs task handlers via an async callback — for deterministic tests."""
 
-    def __init__(self, handler: Callable[[str, dict], None]) -> None:
+    def __init__(self, handler: Callable[[str, dict], Awaitable[None]]) -> None:
         self._handler = handler
 
-    def enqueue(self, task_type: str, payload: dict, dedup_id: str | None = None) -> None:
-        self._handler(task_type, payload)
+    async def enqueue(self, task_type: str, payload: dict, dedup_id: str | None = None) -> None:
+        await self._handler(task_type, payload)

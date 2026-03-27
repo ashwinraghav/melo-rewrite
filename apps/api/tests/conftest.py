@@ -1,5 +1,6 @@
-import json
 import pytest
+import httpx
+from httpx import ASGITransport
 from fastapi.testclient import TestClient
 from mello_api.main import create_app
 from mello_api.repositories.interfaces import Services
@@ -35,8 +36,12 @@ def services():
         search=SearchService(embedding_service=embedding),
         voice_cloner=MockVoiceCloner(),
         catalog_publisher=MockCatalogPublisher(),
-        task_queue=SyncTaskQueue(handler=lambda t, p: None),  # placeholder
+        task_queue=SyncTaskQueue(handler=_noop_handler),
     )
+
+
+async def _noop_handler(task_type: str, payload: dict) -> None:
+    pass
 
 
 @pytest.fixture
@@ -49,11 +54,15 @@ def client(repos):
 def creator_client(repos, services):
     """Client with creator services enabled. SyncTaskQueue dispatches to internal routes."""
     app = create_app(repos=repos, services=services)
-    test_client = TestClient(app)
 
-    # Wire up SyncTaskQueue to dispatch tasks via the internal endpoint
-    def _dispatch(task_type: str, payload: dict) -> None:
-        resp = test_client.post(
+    # Use httpx.AsyncClient with ASGITransport for internal task dispatch.
+    # This avoids deadlock: the dispatch handler runs inside the event loop
+    # (called via await from a route handler), so it must use an async client.
+    transport = ASGITransport(app=app)
+    async_client = httpx.AsyncClient(transport=transport, base_url="http://test")
+
+    async def _dispatch(task_type: str, payload: dict) -> None:
+        resp = await async_client.post(
             f"/internal/tasks/{task_type}",
             json=payload,
         )
@@ -61,7 +70,16 @@ def creator_client(repos, services):
 
     services.task_queue._handler = _dispatch
 
-    return test_client
+    return TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _strict_async():
+    """Convert asyncio slow-callback warnings to errors during tests."""
+    import warnings
+    with warnings.catch_warnings():
+        warnings.filterwarnings("error", message=".*Executing.*took.*seconds")
+        yield
 
 
 def auth(uid: str, email: str | None = None) -> dict:

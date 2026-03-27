@@ -1,6 +1,7 @@
 """
 Catalog publisher tests — static JSON generation for CDN.
 """
+import pytest
 from mello_api.services.catalog_publisher import MockCatalogPublisher, _story_to_list_item, _story_to_detail
 from mello_api.models.story import Story, StorySegment
 
@@ -57,14 +58,15 @@ def test_detail_has_all_list_fields():
         assert key in detail, f"detail missing list field: {key}"
 
 
-def test_mock_publisher_counts_published():
+@pytest.mark.anyio
+async def test_mock_publisher_counts_published():
     publisher = MockCatalogPublisher()
     stories = [
         _make_story("s1", ["park"], published=True),
         _make_story("s2", ["park"], published=True),
         _make_story("s3", ["park"], published=False),  # unpublished
     ]
-    result = publisher.publish_catalog(stories)
+    result = await publisher.publish_catalog(stories)
     assert result == 2  # only published count
     assert publisher.last_count == 2
 

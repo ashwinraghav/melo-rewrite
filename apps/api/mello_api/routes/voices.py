@@ -47,16 +47,16 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
     # ── Authenticated endpoints ───────────────────────────────────────────
 
     @router.get("")
-    def list_voices(user: AuthenticatedUser = Depends(get_current_user)):
-        voices = repos.voices.find_all(user.uid)
+    async def list_voices(user: AuthenticatedUser = Depends(get_current_user)):
+        voices = await repos.voices.find_all(user.uid)
         return {"data": [v.model_dump(by_alias=True) for v in voices], "total": len(voices)}
 
     @router.post("/invite")
-    def create_invite(
+    async def create_invite(
         body: CreateInviteRequest,
         user: AuthenticatedUser = Depends(get_current_user),
     ):
-        if repos.voices.count(user.uid) >= MAX_VOICES_PER_USER:
+        if await repos.voices.count(user.uid) >= MAX_VOICES_PER_USER:
             raise HTTPException(status_code=400, detail="Maximum 3 voices per account")
 
         token = uuid.uuid4().hex
@@ -64,7 +64,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         expires_at = (datetime.now(timezone.utc) + timedelta(days=INVITE_TTL_DAYS)).isoformat()
 
         # Get owner display name for the invite page greeting
-        owner_profile = repos.users.find_by_id(user.uid)
+        owner_profile = await repos.users.find_by_id(user.uid)
         owner_name = owner_profile.display_name if owner_profile else ""
 
         invite = VoiceInvite(
@@ -76,7 +76,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
             created_at=now,
             expires_at=expires_at,
         )
-        repos.voice_invites.create(invite)
+        await repos.voice_invites.create(invite)
 
         return {
             "data": CreateInviteResponse(
@@ -87,36 +87,36 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         }
 
     @router.delete("/{voice_id}", status_code=204)
-    def delete_voice(
+    async def delete_voice(
         voice_id: str,
         user: AuthenticatedUser = Depends(get_current_user),
     ):
-        voice = repos.voices.find_by_id(user.uid, voice_id)
+        voice = await repos.voices.find_by_id(user.uid, voice_id)
         if not voice:
             raise HTTPException(status_code=404, detail="Voice not found")
         # Best-effort cleanup on ElevenLabs
         if voice.eleven_labs_voice_id:
             try:
-                services.voice_cloner.delete_voice(voice.eleven_labs_voice_id)
+                await services.voice_cloner.delete_voice(voice.eleven_labs_voice_id)
             except Exception:
                 pass
-        repos.voices.delete(user.uid, voice_id)
+        await repos.voices.delete(user.uid, voice_id)
 
     @router.post("/convert", status_code=202)
-    def convert_story(
+    async def convert_story(
         body: ConvertStoryRequest,
         user: AuthenticatedUser = Depends(get_current_user),
     ):
         """Enqueue story-to-voice conversion as a background task."""
-        voice = repos.voices.find_by_id(user.uid, body.voice_id)
+        voice = await repos.voices.find_by_id(user.uid, body.voice_id)
         if not voice or voice.status != "ready":
             raise HTTPException(status_code=400, detail="Voice not ready")
 
-        story = repos.stories.find_by_id(body.story_id)
+        story = await repos.stories.find_by_id(body.story_id)
         if not story:
             raise HTTPException(status_code=404, detail="Story not found")
 
-        existing = repos.conversions.find_by_id(user.uid, body.story_id, body.voice_id)
+        existing = await repos.conversions.find_by_id(user.uid, body.story_id, body.voice_id)
         if existing and existing.status in ("processing", "ready"):
             raise HTTPException(status_code=400, detail="Conversion already exists")
 
@@ -130,9 +130,9 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
             created_at=now,
             updated_at=now,
         )
-        repos.conversions.create(user.uid, conversion)
+        await repos.conversions.create(user.uid, conversion)
 
-        services.task_queue.enqueue(
+        await services.task_queue.enqueue(
             "convert-story",
             {
                 "uid": user.uid,
@@ -151,27 +151,27 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         return {"data": conversion.model_dump(by_alias=True)}
 
     @router.get("/conversions/{story_id}")
-    def list_conversions(
+    async def list_conversions(
         story_id: str,
         user: AuthenticatedUser = Depends(get_current_user),
     ):
-        conversions = repos.conversions.find_all_for_story(user.uid, story_id)
-        voices = {v.id: v for v in repos.voices.find_all(user.uid)}
+        conversions = await repos.conversions.find_all_for_story(user.uid, story_id)
+        voices = {v.id: v for v in await repos.voices.find_all(user.uid)}
         result = []
         for c in conversions:
             voice = voices.get(c.voice_id)
             entry = c.model_dump(by_alias=True)
             entry["voiceName"] = voice.name if voice else "Unknown"
             if c.status == "ready" and c.audio_path:
-                entry["audioUrl"] = services.voice_cloner.get_download_url(c.audio_path)
+                entry["audioUrl"] = await services.voice_cloner.get_download_url(c.audio_path)
             result.append(entry)
         return {"data": result, "total": len(result)}
 
     # ── Public endpoints (token-validated) ────────────────────────────────
 
     @router.get("/invite/{token}")
-    def get_invite_info(token: str):
-        invite = repos.voice_invites.find_by_token(token)
+    async def get_invite_info(token: str):
+        invite = await repos.voice_invites.find_by_token(token)
         if not invite:
             raise HTTPException(status_code=404, detail="Invite not found")
         if invite.status != "pending":
@@ -179,7 +179,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         if invite.expires_at < _now():
             raise HTTPException(status_code=400, detail="Invite has expired")
 
-        owner = repos.users.find_by_id(invite.owner_uid)
+        owner = await repos.users.find_by_id(invite.owner_uid)
         return {
             "data": InviteInfoResponse(
                 voice_name=invite.voice_name,
@@ -190,19 +190,19 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         }
 
     @router.post("/invite/{token}/record", status_code=202)
-    def record_voice(token: str, audio: UploadFile = File(...)):
+    async def record_voice(token: str, audio: UploadFile = File(...)):
         """Upload recording, start voice cloning as a background task."""
-        invite = repos.voice_invites.find_by_token(token)
+        invite = await repos.voice_invites.find_by_token(token)
         if not invite:
             raise HTTPException(status_code=404, detail="Invite not found")
         if invite.status != "pending":
             raise HTTPException(status_code=400, detail="Invite has already been used")
         if invite.expires_at < _now():
             raise HTTPException(status_code=400, detail="Invite has expired")
-        if repos.voices.count(invite.owner_uid) >= MAX_VOICES_PER_USER:
+        if await repos.voices.count(invite.owner_uid) >= MAX_VOICES_PER_USER:
             raise HTTPException(status_code=400, detail="Voice limit reached for this account")
 
-        audio_bytes = audio.file.read()
+        audio_bytes = await audio.read()
 
         if len(audio_bytes) < MIN_RECORDING_BYTES:
             raise HTTPException(
@@ -213,8 +213,8 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         voice_id = uuid.uuid4().hex
         now = _now()
 
-        # Upload sample synchronously (small file, fast)
-        sample_path = services.voice_cloner.upload_sample(
+        # Upload sample
+        sample_path = await services.voice_cloner.upload_sample(
             invite.owner_uid, voice_id, audio_bytes,
         )
 
@@ -227,11 +227,11 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
             sample_audio_path=sample_path,
             created_at=now,
         )
-        repos.voices.create(invite.owner_uid, voice)
-        repos.voice_invites.mark_used(token, voice_id)
+        await repos.voices.create(invite.owner_uid, voice)
+        await repos.voice_invites.mark_used(token, voice_id)
 
         # Enqueue cloning as a background task
-        services.task_queue.enqueue(
+        await services.task_queue.enqueue(
             "clone-voice",
             {
                 "ownerUid": invite.owner_uid,

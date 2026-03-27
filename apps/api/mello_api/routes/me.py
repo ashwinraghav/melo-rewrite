@@ -14,12 +14,12 @@ def _now() -> str:
 def make_router(repos: Repositories) -> APIRouter:
     router = APIRouter(prefix="/v1/me")
 
-    def _ensure_profile(uid: str, email: str | None) -> UserProfile:
+    async def _ensure_profile(uid: str, email: str | None) -> UserProfile:
         """Return existing profile, creating one on first sign-in."""
-        profile = repos.users.find_by_id(uid)
+        profile = await repos.users.find_by_id(uid)
         if profile is None:
             now = _now()
-            profile = repos.users.create(UserProfile(
+            profile = await repos.users.create(UserProfile(
                 uid=uid,
                 email=email or "",
                 display_name=None,
@@ -30,7 +30,7 @@ def make_router(repos: Repositories) -> APIRouter:
             ))
         return profile
 
-    def _resolve_story_urls(story: Story) -> StoryWithAudioUrl:
+    async def _resolve_story_urls(story: Story) -> StoryWithAudioUrl:
         return StoryWithAudioUrl(
             id=story.id,
             title=story.title,
@@ -40,32 +40,32 @@ def make_router(repos: Repositories) -> APIRouter:
             age_min=story.age_min,
             age_max=story.age_max,
             topics=story.topics,
-            audio_url=repos.stories.get_audio_signed_url(story.id, story.audio_path),
-            cover_art_url=repos.stories.get_cover_art_signed_url(story.id, story.cover_art_path),
+            audio_url=await repos.stories.get_audio_signed_url(story.id, story.audio_path),
+            cover_art_url=await repos.stories.get_cover_art_signed_url(story.id, story.cover_art_path),
             is_published=story.is_published,
             created_at=story.created_at,
             updated_at=story.updated_at,
         )
 
     @router.get("")
-    def get_profile(user: AuthenticatedUser = Depends(get_current_user)):
-        profile = _ensure_profile(user.uid, user.email)
+    async def get_profile(user: AuthenticatedUser = Depends(get_current_user)):
+        profile = await _ensure_profile(user.uid, user.email)
         return {"data": profile.model_dump(by_alias=True)}
 
     @router.patch("")
-    def update_profile(body: UpdateProfileBody, user: AuthenticatedUser = Depends(get_current_user)):
-        _ensure_profile(user.uid, user.email)
+    async def update_profile(body: UpdateProfileBody, user: AuthenticatedUser = Depends(get_current_user)):
+        await _ensure_profile(user.uid, user.email)
         # Only pass fields that were explicitly included in the request body
         update_data = {k: v for k, v in body.model_dump().items() if v is not None or k in body.model_fields_set}
-        updated = repos.users.update(user.uid, update_data)
+        updated = await repos.users.update(user.uid, update_data)
         return {"data": updated.model_dump(by_alias=True)}
 
     @router.post("/accept-terms")
-    def accept_terms(body: AcceptTermsBody, user: AuthenticatedUser = Depends(get_current_user)):
-        _ensure_profile(user.uid, user.email)
+    async def accept_terms(body: AcceptTermsBody, user: AuthenticatedUser = Depends(get_current_user)):
+        await _ensure_profile(user.uid, user.email)
         if body.terms_version != CURRENT_TERMS_VERSION:
             raise HTTPException(status_code=400, detail=f"Invalid terms version. Current version is {CURRENT_TERMS_VERSION}")
-        updated = repos.users.update(user.uid, {
+        updated = await repos.users.update(user.uid, {
             "terms_version": body.terms_version,
             "terms_accepted_at": _now(),
         })
@@ -74,36 +74,36 @@ def make_router(repos: Repositories) -> APIRouter:
     # ── Favorites ──────────────────────────────────────────────────────────────
 
     @router.get("/favorites")
-    def list_favorites(user: AuthenticatedUser = Depends(get_current_user)):
-        favorites = repos.favorites.find_all(user.uid)
+    async def list_favorites(user: AuthenticatedUser = Depends(get_current_user)):
+        favorites = await repos.favorites.find_all(user.uid)
         return {"data": [f.model_dump(by_alias=True) for f in favorites], "total": len(favorites), "hasMore": False}
 
     @router.post("/favorites/{story_id}", status_code=201)
-    def add_favorite(story_id: str, user: AuthenticatedUser = Depends(get_current_user)):
-        story = repos.stories.find_by_id(story_id)
+    async def add_favorite(story_id: str, user: AuthenticatedUser = Depends(get_current_user)):
+        story = await repos.stories.find_by_id(story_id)
         if story is None:
             raise HTTPException(status_code=404, detail="Story not found")
-        favorite = repos.favorites.add(user.uid, story_id)
+        favorite = await repos.favorites.add(user.uid, story_id)
         return {"data": favorite.model_dump(by_alias=True)}
 
     @router.delete("/favorites/{story_id}", status_code=204)
-    def remove_favorite(story_id: str, user: AuthenticatedUser = Depends(get_current_user)):
-        repos.favorites.remove(user.uid, story_id)
+    async def remove_favorite(story_id: str, user: AuthenticatedUser = Depends(get_current_user)):
+        await repos.favorites.remove(user.uid, story_id)
 
     # ── History ────────────────────────────────────────────────────────────────
 
     @router.get("/history")
-    def list_history(user: AuthenticatedUser = Depends(get_current_user)):
-        entries = repos.history.find_all(user.uid)
+    async def list_history(user: AuthenticatedUser = Depends(get_current_user)):
+        entries = await repos.history.find_all(user.uid)
         return {"data": [e.model_dump(by_alias=True) for e in entries], "total": len(entries), "hasMore": False}
 
     @router.post("/history/{story_id}", status_code=201)
-    def record_progress(
+    async def record_progress(
         story_id: str,
         body: dict,
         user: AuthenticatedUser = Depends(get_current_user),
     ):
-        story = repos.stories.find_by_id(story_id)
+        story = await repos.stories.find_by_id(story_id)
         if story is None:
             raise HTTPException(status_code=404, detail="Story not found")
 
@@ -113,7 +113,7 @@ def make_router(repos: Repositories) -> APIRouter:
         if not isinstance(progress_seconds, (int, float)) or progress_seconds < 0:
             raise HTTPException(status_code=400, detail="progressSeconds must be a non-negative number")
 
-        entry = repos.history.upsert(user.uid, story_id, int(progress_seconds), bool(completed))
+        entry = await repos.history.upsert(user.uid, story_id, int(progress_seconds), bool(completed))
         return {"data": entry.model_dump(by_alias=True)}
 
     return router

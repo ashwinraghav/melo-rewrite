@@ -6,12 +6,13 @@ ABC interface + production (ElevenLabs) and test (mock) implementations.
 """
 from __future__ import annotations
 
+import asyncio
 import base64
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-import requests
+import httpx
 from google.cloud import storage as gcs
 
 
@@ -24,7 +25,7 @@ class PublishResult:
 
 class AudioPublisherService(ABC):
     @abstractmethod
-    def publish(
+    async def publish(
         self,
         story_id: str,
         story_text: str,
@@ -49,12 +50,14 @@ class ElevenLabsPublisher(AudioPublisherService):
         self._model_id = model_id
         self._bucket_name = bucket_name
         self._gcs_client = gcs.Client(project=gcp_project_id)
-        self._session = requests.Session()
-        self._session.headers.update({"xi-api-key": api_key})
+        self._client = httpx.AsyncClient(
+            headers={"xi-api-key": api_key},
+            timeout=120,
+        )
 
-    def _generate_with_timestamps(self, text: str, voice_id: str | None = None) -> dict:
+    async def _generate_with_timestamps(self, text: str, voice_id: str | None = None) -> dict:
         vid = voice_id or self._voice_id
-        resp = self._session.post(
+        resp = await self._client.post(
             f"{self.API_BASE}/text-to-speech/{vid}/with-timestamps",
             headers={"Content-Type": "application/json"},
             json={
@@ -67,7 +70,6 @@ class ElevenLabsPublisher(AudioPublisherService):
                     "use_speaker_boost": True,
                 },
             },
-            timeout=120,
         )
         resp.raise_for_status()
         return resp.json()
@@ -112,7 +114,7 @@ class ElevenLabsPublisher(AudioPublisherService):
 
         return segments
 
-    def _upload_audio(
+    async def _upload_audio(
         self, story_id: str, audio_bytes: bytes,
         path_override: str | None = None, bucket_override: str | None = None,
     ) -> str:
@@ -125,10 +127,10 @@ class ElevenLabsPublisher(AudioPublisherService):
         else:
             bucket = self._gcs_client.bucket(bucket_name)
         blob = bucket.blob(gcs_path)
-        blob.upload_from_string(audio_bytes, content_type="audio/mpeg")
+        await asyncio.to_thread(blob.upload_from_string, audio_bytes, "audio/mpeg")
         return gcs_path
 
-    def publish(
+    async def publish(
         self,
         story_id: str,
         story_text: str,
@@ -136,7 +138,7 @@ class ElevenLabsPublisher(AudioPublisherService):
         audio_path_override: str | None = None,
         bucket_override: str | None = None,
     ) -> PublishResult:
-        result = self._generate_with_timestamps(story_text, voice_id=voice_id)
+        result = await self._generate_with_timestamps(story_text, voice_id=voice_id)
 
         audio_bytes = base64.b64decode(result["audio_base64"])
         alignment = result["alignment"]
@@ -147,7 +149,7 @@ class ElevenLabsPublisher(AudioPublisherService):
             duration = int(len(story_text.split()) / 2.5)
 
         segments = self._chars_to_sentence_segments(story_text, alignment)
-        audio_path = self._upload_audio(
+        audio_path = await self._upload_audio(
             story_id, audio_bytes,
             path_override=audio_path_override,
             bucket_override=bucket_override,
@@ -163,7 +165,7 @@ class ElevenLabsPublisher(AudioPublisherService):
 class MockAudioPublisher(AudioPublisherService):
     """Returns canned data for tests — no API calls."""
 
-    def publish(
+    async def publish(
         self,
         story_id: str,
         story_text: str,

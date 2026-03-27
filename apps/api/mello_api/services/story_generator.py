@@ -53,15 +53,15 @@ Respond with ONLY a JSON object (no markdown, no code fences) with these fields:
 
 class StoryGeneratorService(ABC):
     @abstractmethod
-    def generate(self, prompt: str) -> GeneratedStory: ...
+    async def generate(self, prompt: str) -> GeneratedStory: ...
 
 
 class ClaudeStoryGenerator(StoryGeneratorService):
     def __init__(self, api_key: str) -> None:
-        self._client = anthropic.Anthropic(api_key=api_key)
+        self._client = anthropic.AsyncAnthropic(api_key=api_key)
 
-    def generate(self, prompt: str) -> GeneratedStory:
-        message = self._client.messages.create(
+    async def generate(self, prompt: str) -> GeneratedStory:
+        message = await self._client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=2048,
             system=SYSTEM_PROMPT,
@@ -83,7 +83,7 @@ class ClaudeStoryGenerator(StoryGeneratorService):
 class MockStoryGenerator(StoryGeneratorService):
     """Returns canned data for tests — no API calls."""
 
-    def generate(self, prompt: str) -> GeneratedStory:
+    async def generate(self, prompt: str) -> GeneratedStory:
         return GeneratedStory(
             title="The Gentle Breeze",
             description="A soft wind carries seeds across a meadow.",

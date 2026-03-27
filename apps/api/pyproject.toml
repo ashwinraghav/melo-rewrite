@@ -11,13 +11,14 @@ dependencies = [
     "python-dotenv>=1.0",
     "pydantic>=2.9",
     "anthropic>=0.40",
-    "requests>=2.31",
+    "httpx>=0.27",
     "google-genai>=1.0",
     "Pillow>=10.0",
     "cohere>=5.0",
     "google-cloud-tasks>=2.16",
     "python-multipart>=0.0.9",
     "sentry-sdk[fastapi]>=2.0",
+    "gcloud-aio-storage>=9.0",
 ]
 
 [project.optional-dependencies]
@@ -31,4 +32,4 @@ dev = [
 testpaths = ["tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I"]
+select = ["E", "F", "I", "ASYNC"]

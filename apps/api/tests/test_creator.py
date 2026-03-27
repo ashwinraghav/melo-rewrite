@@ -1,4 +1,5 @@
 """Tests for the creator endpoints: generate, update draft, publish."""
+import asyncio
 from tests.conftest import auth
 
 
@@ -30,7 +31,7 @@ def test_generate_creates_draft(creator_client, repos):
     assert data["generateStatus"] == "processing"
 
     # SyncTaskQueue dispatched generate-story synchronously
-    story = repos.stories.find_by_id_any(data["id"])
+    story = asyncio.run(repos.stories.find_by_id_any(data["id"]))
     assert story is not None
     assert story.is_published is False
     assert story.generate_status == "ready"
@@ -117,7 +118,7 @@ def test_publish_story(creator_client, repos):
     assert resp.json()["data"]["publishStatus"] == "processing"
 
     # SyncTaskQueue dispatched the task synchronously, so the story should be published
-    story = repos.stories.find_by_id(story_id)
+    story = asyncio.run(repos.stories.find_by_id(story_id))
     assert story is not None
     assert story.is_published is True
     assert story.publish_status == "ready"
@@ -196,7 +197,7 @@ def test_update_single_field_preserves_others(creator_client, repos):
     )
     story_id = gen_resp.json()["data"]["id"]
     # SyncTaskQueue completed — get original description from repo
-    original_description = repos.stories.find_by_id_any(story_id).description
+    original_description = asyncio.run(repos.stories.find_by_id_any(story_id)).description
 
     resp = creator_client.patch(
         f"/v1/creator/stories/{story_id}",
@@ -207,7 +208,7 @@ def test_update_single_field_preserves_others(creator_client, repos):
     assert resp.json()["data"]["title"] == "New Title Only"
 
     # Description should be unchanged
-    story = repos.stories.find_by_id_any(story_id)
+    story = asyncio.run(repos.stories.find_by_id_any(story_id))
     assert story.description == original_description
 
 
@@ -222,7 +223,7 @@ def test_generated_story_has_user_source(creator_client, repos):
     )
     story_id = gen_resp.json()["data"]["id"]
 
-    story = repos.stories.find_by_id_any(story_id)
+    story = asyncio.run(repos.stories.find_by_id_any(story_id))
     assert story.source == "user"
 
 
@@ -242,13 +243,13 @@ def test_published_story_retains_user_source(creator_client, repos):
     assert resp.status_code == 202
 
     # SyncTaskQueue completed synchronously — verify source preserved
-    story = repos.stories.find_by_id(story_id)
+    story = asyncio.run(repos.stories.find_by_id(story_id))
     assert story.source == "user"
 
 
 def test_curated_stories_default_to_curated_source(repos):
     """Fixture stories (not from creator) should default to source='curated'."""
-    story = repos.stories.find_by_id("the-whispering-pines")
+    story = asyncio.run(repos.stories.find_by_id("the-whispering-pines"))
     assert story is not None
     assert story.source == "curated"
 
@@ -269,7 +270,7 @@ def test_publish_generates_segments(creator_client, repos):
         headers=auth(TEST_UID),
     )
 
-    story = repos.stories.find_by_id(story_id)
+    story = asyncio.run(repos.stories.find_by_id(story_id))
     assert len(story.segments) > 0
     # Segments are stored as camelCase dicts from MockAudioPublisher
     seg = story.segments[0]
@@ -291,7 +292,7 @@ def test_publish_generates_embedding(creator_client, repos):
         headers=auth(TEST_UID),
     )
 
-    story = repos.stories.find_by_id(story_id)
+    story = asyncio.run(repos.stories.find_by_id(story_id))
     assert len(story.embedding) > 0
 
 

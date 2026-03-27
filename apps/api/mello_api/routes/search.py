@@ -19,13 +19,13 @@ from ..repositories.interfaces import Repositories, Services
 def make_router(repos: Repositories, services: Services) -> APIRouter:
     router = APIRouter(prefix="/v1")
 
-    def _resolve_story_urls(story: Story) -> StoryWithAudioUrl:
+    async def _resolve_story_urls(story: Story) -> StoryWithAudioUrl:
         audio_url = ""
         cover_art_url = ""
         if story.audio_path:
-            audio_url = repos.stories.get_audio_signed_url(story.id, story.audio_path)
+            audio_url = await repos.stories.get_audio_signed_url(story.id, story.audio_path)
         if story.cover_art_path:
-            cover_art_url = repos.stories.get_cover_art_signed_url(story.id, story.cover_art_path)
+            cover_art_url = await repos.stories.get_cover_art_signed_url(story.id, story.cover_art_path)
         return StoryWithAudioUrl(
             id=story.id,
             title=story.title,
@@ -44,11 +44,11 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         )
 
     @router.post("/search")
-    def search_stories(
+    async def search_stories(
         body: SearchStoriesRequest,
         _user: AuthenticatedUser = Depends(get_current_user),
     ):
-        results = services.search.search(
+        results = await services.search.search(
             query=body.query,
             story_repo=repos.stories,
             child_age=body.child_age,
@@ -57,7 +57,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
 
         data = [
             {
-                **_resolve_story_urls(story).model_dump(by_alias=True),
+                **(await _resolve_story_urls(story)).model_dump(by_alias=True),
                 "score": round(score, 4),
             }
             for story, score in results

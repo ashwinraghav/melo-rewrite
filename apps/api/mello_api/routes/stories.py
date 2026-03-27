@@ -9,7 +9,7 @@ from ..models.story import StoryFilters, StoryWithAudioUrl, Story, categorize_du
 def make_router(repos: Repositories) -> APIRouter:
     router = APIRouter(prefix="/v1")
 
-    def resolve_story_urls(story: Story, include_text: bool = False) -> StoryWithAudioUrl:
+    async def resolve_story_urls(story: Story, include_text: bool = False) -> StoryWithAudioUrl:
         return StoryWithAudioUrl(
             id=story.id,
             title=story.title,
@@ -19,8 +19,8 @@ def make_router(repos: Repositories) -> APIRouter:
             age_min=story.age_min,
             age_max=story.age_max,
             topics=story.topics,
-            audio_url=repos.stories.get_audio_public_url(story.audio_path),
-            cover_art_url=repos.stories.get_cover_art_public_url(story.cover_art_path),
+            audio_url=await repos.stories.get_audio_public_url(story.audio_path),
+            cover_art_url=await repos.stories.get_cover_art_public_url(story.cover_art_path),
             story_text=story.story_text if include_text else None,
             segments=story.segments if include_text else None,
             source=story.source,
@@ -30,7 +30,7 @@ def make_router(repos: Repositories) -> APIRouter:
         )
 
     @router.get("/stories")
-    def list_stories(
+    async def list_stories(
         topics: Optional[str] = Query(default=None),
         child_age: Optional[int] = Query(default=None, ge=1, le=12, alias="childAge"),
         duration: Optional[StoryDuration] = Query(default=None),
@@ -41,18 +41,18 @@ def make_router(repos: Repositories) -> APIRouter:
             child_age=child_age,
             duration=duration,
         )
-        stories = repos.stories.find_many(filters)
-        with_urls = [resolve_story_urls(s).model_dump(by_alias=True) for s in stories]
+        stories = await repos.stories.find_many(filters)
+        with_urls = [(await resolve_story_urls(s)).model_dump(by_alias=True) for s in stories]
         return {"data": with_urls, "total": len(with_urls), "hasMore": False}
 
     @router.get("/stories/{story_id}")
-    def get_story(
+    async def get_story(
         story_id: str,
         _user: AuthenticatedUser = Depends(get_current_user),
     ):
-        story = repos.stories.find_by_id(story_id)
+        story = await repos.stories.find_by_id(story_id)
         if story is None:
             raise HTTPException(status_code=404, detail="Story not found")
-        return {"data": resolve_story_urls(story, include_text=True).model_dump(by_alias=True)}
+        return {"data": (await resolve_story_urls(story, include_text=True)).model_dump(by_alias=True)}
 
     return router

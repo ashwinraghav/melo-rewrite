@@ -9,12 +9,11 @@ POST /internal/tasks/convert-story   { uid, storyId, voiceId, elevenLabsVoiceId,
 Protected by OIDC token validation in production.
 In development/test, ENV != production bypasses OIDC.
 
-IMPORTANT: All handlers are sync (def, not async def) because they call
-blocking external APIs (Claude, ElevenLabs, Vertex AI). FastAPI runs sync
-handlers in a threadpool, keeping the event loop free for other requests.
+All handlers are async def — they await async service and repository methods.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -53,7 +52,7 @@ class ConvertStoryTask(BaseModel):
 
 # ── OIDC verification ──────────────────────────────────────────────────────
 
-def _verify_internal_request(request: Request) -> None:
+async def _verify_internal_request(request: Request) -> None:
     """Verify the request is from Cloud Tasks (OIDC) or a test environment."""
     from ..config import config
     if config.env != "production":
@@ -68,7 +67,7 @@ def _verify_internal_request(request: Request) -> None:
         from google.oauth2 import id_token
         from google.auth.transport.requests import Request as GoogleAuthRequest
 
-        claims = id_token.verify_oauth2_token(token, GoogleAuthRequest())
+        claims = await asyncio.to_thread(id_token.verify_oauth2_token, token, GoogleAuthRequest())
         expected_email = f"mello-api@{config.gcp_project_id}.iam.gserviceaccount.com"
         if claims.get("email") != expected_email:
             raise HTTPException(status_code=403, detail="Invalid service account")
@@ -83,14 +82,14 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
     router = APIRouter(prefix="/internal/tasks")
 
     @router.post("/generate-story")
-    def generate_story_task(
+    async def generate_story_task(
         body: GenerateStoryTask,
         _auth: None = Depends(_verify_internal_request),
     ):
         try:
-            generated = services.story_generator.generate(body.prompt)
+            generated = await services.story_generator.generate(body.prompt)
 
-            repos.stories.update(body.storyId, {
+            await repos.stories.update(body.storyId, {
                 "title": generated.title,
                 "description": generated.description,
                 "story_text": generated.story_text,
@@ -107,36 +106,36 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
 
         except Exception as e:
             log.exception("generate-story failed for %s: %s", body.storyId, e)
-            repos.stories.update(body.storyId, {
+            await repos.stories.update(body.storyId, {
                 "generate_status": "failed",
                 "generate_error": str(e),
             })
             return {"status": "failed", "detail": str(e)}
 
     @router.post("/publish-story")
-    def publish_story_task(
+    async def publish_story_task(
         body: PublishStoryTask,
         _auth: None = Depends(_verify_internal_request),
     ):
-        story = repos.stories.find_by_id_any(body.storyId)
+        story = await repos.stories.find_by_id_any(body.storyId)
         if story is None:
             log.error("publish-story: story %s not found", body.storyId)
             return {"status": "error", "detail": "Story not found"}
 
         try:
-            repos.stories.update(body.storyId, {"publish_step": "generating_audio"})
-            audio_result = services.audio_publisher.publish(body.storyId, story.story_text)
+            await repos.stories.update(body.storyId, {"publish_step": "generating_audio"})
+            audio_result = await services.audio_publisher.publish(body.storyId, story.story_text)
 
-            repos.stories.update(body.storyId, {"publish_step": "creating_cover"})
-            cover_path = services.cover_generator.generate_and_upload(
+            await repos.stories.update(body.storyId, {"publish_step": "creating_cover"})
+            cover_path = await services.cover_generator.generate_and_upload(
                 body.storyId, story.title, story.description, story.topics
             )
 
-            repos.stories.update(body.storyId, {"publish_step": "generating_embedding"})
-            embedding = services.embedding.embed_story(story)
+            await repos.stories.update(body.storyId, {"publish_step": "generating_embedding"})
+            embedding = await services.embedding.embed_story(story)
 
-            repos.stories.update(body.storyId, {"publish_step": "finalizing"})
-            repos.stories.update(body.storyId, {
+            await repos.stories.update(body.storyId, {"publish_step": "finalizing"})
+            await repos.stories.update(body.storyId, {
                 "audio_path": audio_result.audio_path,
                 "cover_art_path": cover_path,
                 "duration_seconds": audio_result.duration_seconds,
@@ -150,15 +149,15 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
             })
 
             services.search.invalidate()
-            all_stories = repos.stories.find_many(StoryFilters())
-            services.catalog_publisher.publish_catalog(all_stories)
+            all_stories = await repos.stories.find_many(StoryFilters())
+            await services.catalog_publisher.publish_catalog(all_stories)
 
             log.info("publish-story completed for %s", body.storyId)
             return {"status": "ok"}
 
         except Exception as e:
             log.exception("publish-story failed for %s: %s", body.storyId, e)
-            repos.stories.update(body.storyId, {
+            await repos.stories.update(body.storyId, {
                 "publish_status": "failed",
                 "publish_step": "",
                 "publish_error": str(e),
@@ -166,15 +165,15 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
             return {"status": "failed", "detail": str(e)}
 
     @router.post("/clone-voice")
-    def clone_voice_task(
+    async def clone_voice_task(
         body: CloneVoiceTask,
         _auth: None = Depends(_verify_internal_request),
     ):
         try:
-            audio_bytes = services.voice_cloner.download_sample(body.samplePath)
-            result = services.voice_cloner.clone_voice(body.voiceName, audio_bytes)
+            audio_bytes = await services.voice_cloner.download_sample(body.samplePath)
+            result = await services.voice_cloner.clone_voice(body.voiceName, audio_bytes)
 
-            repos.voices.update(body.ownerUid, body.voiceId, {
+            await repos.voices.update(body.ownerUid, body.voiceId, {
                 "eleven_labs_voice_id": result.eleven_labs_voice_id,
                 "status": "ready",
             })
@@ -184,16 +183,16 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
 
         except Exception as e:
             log.exception("clone-voice failed for voice %s: %s", body.voiceId, e)
-            repos.voices.update(body.ownerUid, body.voiceId, {"status": "failed"})
+            await repos.voices.update(body.ownerUid, body.voiceId, {"status": "failed"})
             return {"status": "failed", "detail": str(e)}
 
     @router.post("/convert-story")
-    def convert_story_task(
+    async def convert_story_task(
         body: ConvertStoryTask,
         _auth: None = Depends(_verify_internal_request),
     ):
         try:
-            result = services.audio_publisher.publish(
+            result = await services.audio_publisher.publish(
                 body.storyId,
                 body.storyText,
                 voice_id=body.elevenLabsVoiceId,
@@ -201,7 +200,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
                 bucket_override=body.bucketOverride,
             )
 
-            repos.conversions.update(body.uid, body.storyId, body.voiceId, {
+            await repos.conversions.update(body.uid, body.storyId, body.voiceId, {
                 "status": "ready",
                 "duration_seconds": result.duration_seconds,
                 "segments": result.segments,
@@ -212,7 +211,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
 
         except Exception as e:
             log.exception("convert-story failed: %s", e)
-            repos.conversions.update(body.uid, body.storyId, body.voiceId, {"status": "failed"})
+            await repos.conversions.update(body.uid, body.storyId, body.voiceId, {"status": "failed"})
             return {"status": "failed", "detail": str(e)}
 
     return router

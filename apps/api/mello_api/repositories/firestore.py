@@ -3,6 +3,7 @@ Firestore + Cloud Storage repository implementations for production.
 Signed URLs use ADC — the service account must have serviceAccountTokenCreator on itself.
 """
 from __future__ import annotations
+import asyncio
 from datetime import timedelta, datetime, timezone
 from typing import TYPE_CHECKING
 import google.auth
@@ -20,7 +21,7 @@ from .interfaces import (
 )
 
 if TYPE_CHECKING:
-    import google.cloud.firestore
+    from google.cloud.firestore_v1.async_client import AsyncClient
 
 
 def _now() -> str:
@@ -61,7 +62,7 @@ def _story_from_doc(doc_id: str, data: dict) -> Story:
 
 
 class FirestoreStoryRepository(StoryRepository):
-    def __init__(self, db: "google.cloud.firestore.Client", bucket_name: str, url_ttl_seconds: int) -> None:
+    def __init__(self, db: "AsyncClient", bucket_name: str, url_ttl_seconds: int) -> None:
         self._db = db
         self._bucket_name = bucket_name
         self._url_ttl_seconds = url_ttl_seconds
@@ -78,20 +79,20 @@ class FirestoreStoryRepository(StoryRepository):
             except (AttributeError, Exception):
                 pass  # Local dev ADC — signed URLs won't work but public URLs do
 
-    def find_by_id(self, story_id: str) -> Story | None:
-        doc = self._db.collection("stories").document(story_id).get()
+    async def find_by_id(self, story_id: str) -> Story | None:
+        doc = await self._db.collection("stories").document(story_id).get()
         if not doc.exists:
             return None
         story = _story_from_doc(doc.id, doc.to_dict())
         return story if story.is_published else None
 
-    def find_by_id_any(self, story_id: str) -> Story | None:
-        doc = self._db.collection("stories").document(story_id).get()
+    async def find_by_id_any(self, story_id: str) -> Story | None:
+        doc = await self._db.collection("stories").document(story_id).get()
         if not doc.exists:
             return None
         return _story_from_doc(doc.id, doc.to_dict())
 
-    def create(self, story: Story) -> Story:
+    async def create(self, story: Story) -> Story:
         doc_data = {
             "title": story.title,
             "description": story.description,
@@ -119,10 +120,10 @@ class FirestoreStoryRepository(StoryRepository):
             "createdAt": story.created_at,
             "updatedAt": story.updated_at,
         }
-        self._db.collection("stories").document(story.id).set(doc_data)
+        await self._db.collection("stories").document(story.id).set(doc_data)
         return story
 
-    def update(self, story_id: str, data: dict) -> Story | None:
+    async def update(self, story_id: str, data: dict) -> Story | None:
         field_map = {
             "duration_seconds": "durationSeconds",
             "duration_category": "durationCategory",
@@ -150,10 +151,10 @@ class FirestoreStoryRepository(StoryRepository):
             else:
                 firestore_data[field_map.get(k, k)] = v
         firestore_data["updatedAt"] = _now()
-        self._db.collection("stories").document(story_id).update(firestore_data)
-        return self.find_by_id_any(story_id)
+        await self._db.collection("stories").document(story_id).update(firestore_data)
+        return await self.find_by_id_any(story_id)
 
-    def find_many(self, filters: StoryFilters) -> list[Story]:
+    async def find_many(self, filters: StoryFilters) -> list[Story]:
         query = self._db.collection("stories").where("isPublished", "==", True)
 
         # Use Firestore array-contains for single-topic filtering (most common case).
@@ -164,8 +165,9 @@ class FirestoreStoryRepository(StoryRepository):
             query = query.where("topics", "array_contains", filters.topics[0])
             topics_handled = True
 
-        docs = query.stream()
-        stories = [_story_from_doc(d.id, d.to_dict()) for d in docs]
+        stories = []
+        async for doc in query.stream():
+            stories.append(_story_from_doc(doc.id, doc.to_dict()))
 
         if filters.topics and not topics_handled:
             stories = [s for s in stories if any(t in s.topics for t in filters.topics)]
@@ -176,7 +178,7 @@ class FirestoreStoryRepository(StoryRepository):
 
         return stories
 
-    def vector_search(self, query_embedding: list[float], limit: int = 20) -> list[tuple[Story, float]]:
+    async def vector_search(self, query_embedding: list[float], limit: int = 20) -> list[tuple[Story, float]]:
         from google.cloud.firestore_v1.base_vector_query import DistanceMeasure
         from google.cloud.firestore_v1.vector import Vector
 
@@ -190,7 +192,7 @@ class FirestoreStoryRepository(StoryRepository):
         )
 
         results = []
-        for doc in vector_query.stream():
+        async for doc in vector_query.stream():
             data = doc.to_dict()
             story = _story_from_doc(doc.id, data)
             distance = data.get("vector_distance", 1.0)
@@ -199,15 +201,14 @@ class FirestoreStoryRepository(StoryRepository):
 
         return results
 
-    def _signed_url(self, path: str) -> str:
+    def _signed_url_sync(self, path: str) -> str:
+        """Synchronous signed URL generation — called via asyncio.to_thread."""
         blob = self._gcs_client.bucket(self._bucket_name).blob(path)
         expiration = timedelta(seconds=self._url_ttl_seconds)
 
         if isinstance(self._credentials, SACredentials):
-            # Local dev with service account JSON
             return blob.generate_signed_url(version="v4", expiration=expiration, method="GET")
         else:
-            # Cloud Run — refresh token only when expired
             if not self._credentials.token or not self._credentials.valid:
                 self._credentials.refresh(GoogleAuthRequest())
             return blob.generate_signed_url(
@@ -218,28 +219,28 @@ class FirestoreStoryRepository(StoryRepository):
                 access_token=self._credentials.token,
             )
 
-    def get_audio_signed_url(self, story_id: str, audio_path: str) -> str:
-        return self._signed_url(audio_path)
+    async def get_audio_signed_url(self, story_id: str, audio_path: str) -> str:
+        return await asyncio.to_thread(self._signed_url_sync, audio_path)
 
-    def get_cover_art_signed_url(self, story_id: str, cover_art_path: str) -> str:
-        return self._signed_url(cover_art_path)
+    async def get_cover_art_signed_url(self, story_id: str, cover_art_path: str) -> str:
+        return await asyncio.to_thread(self._signed_url_sync, cover_art_path)
 
-    def get_cover_art_public_url(self, cover_art_path: str) -> str:
+    async def get_cover_art_public_url(self, cover_art_path: str) -> str:
         return f"https://cdn.melostories.com/{cover_art_path}"
 
-    def get_audio_public_url(self, audio_path: str) -> str:
+    async def get_audio_public_url(self, audio_path: str) -> str:
         return f"https://cdn.melostories.com/{audio_path}"
 
 
 class FirestoreUserRepository(UserRepository):
-    def __init__(self, db: "google.cloud.firestore.Client") -> None:
+    def __init__(self, db: "AsyncClient") -> None:
         self._db = db
 
     def _ref(self, uid: str):
         return self._db.collection("users").document(uid)
 
-    def find_by_id(self, uid: str) -> UserProfile | None:
-        doc = self._ref(uid).get()
+    async def find_by_id(self, uid: str) -> UserProfile | None:
+        doc = await self._ref(uid).get()
         if not doc.exists:
             return None
         data = doc.to_dict()
@@ -256,7 +257,7 @@ class FirestoreUserRepository(UserRepository):
             updated_at=data.get("updatedAt", _now()),
         )
 
-    def create(self, profile: UserProfile) -> UserProfile:
+    async def create(self, profile: UserProfile) -> UserProfile:
         data = {
             "email": profile.email,
             "displayName": profile.display_name,
@@ -268,10 +269,10 @@ class FirestoreUserRepository(UserRepository):
             "createdAt": profile.created_at,
             "updatedAt": profile.updated_at,
         }
-        self._ref(profile.uid).set(data)
+        await self._ref(profile.uid).set(data)
         return profile
 
-    def update(self, uid: str, data: dict) -> UserProfile:
+    async def update(self, uid: str, data: dict) -> UserProfile:
         # Map Python snake_case keys to Firestore camelCase
         field_map = {
             "child_age": "childAge",
@@ -282,59 +283,58 @@ class FirestoreUserRepository(UserRepository):
         }
         firestore_data = {field_map.get(k, k): v for k, v in data.items()}
         firestore_data["updatedAt"] = _now()
-        self._ref(uid).update(firestore_data)
-        profile = self.find_by_id(uid)
+        await self._ref(uid).update(firestore_data)
+        profile = await self.find_by_id(uid)
         assert profile is not None
         return profile
 
 
 class FirestoreFavoriteRepository(FavoriteRepository):
-    def __init__(self, db: "google.cloud.firestore.Client") -> None:
+    def __init__(self, db: "AsyncClient") -> None:
         self._db = db
 
     def _ref(self, uid: str, story_id: str):
         return self._db.collection("users").document(uid).collection("favorites").document(story_id)
 
-    def find_all(self, uid: str) -> list[Favorite]:
-        docs = (
+    async def find_all(self, uid: str) -> list[Favorite]:
+        query = (
             self._db.collection("users").document(uid).collection("favorites")
             .order_by("createdAt", direction="DESCENDING")
-            .stream()
         )
         return [
             Favorite(user_id=uid, story_id=d.id, created_at=d.to_dict().get("createdAt", _now()))
-            for d in docs
+            async for d in query.stream()
         ]
 
-    def add(self, uid: str, story_id: str) -> Favorite:
+    async def add(self, uid: str, story_id: str) -> Favorite:
         ref = self._ref(uid, story_id)
-        doc = ref.get()
+        doc = await ref.get()
         if doc.exists:
             data = doc.to_dict()
             return Favorite(user_id=uid, story_id=story_id, created_at=data.get("createdAt", _now()))
         created_at = _now()
-        ref.set({"createdAt": created_at})
+        await ref.set({"createdAt": created_at})
         return Favorite(user_id=uid, story_id=story_id, created_at=created_at)
 
-    def remove(self, uid: str, story_id: str) -> None:
-        self._ref(uid, story_id).delete()
+    async def remove(self, uid: str, story_id: str) -> None:
+        await self._ref(uid, story_id).delete()
 
-    def exists(self, uid: str, story_id: str) -> bool:
-        return self._ref(uid, story_id).get().exists
+    async def exists(self, uid: str, story_id: str) -> bool:
+        doc = await self._ref(uid, story_id).get()
+        return doc.exists
 
 
 class FirestoreHistoryRepository(HistoryRepository):
-    def __init__(self, db: "google.cloud.firestore.Client") -> None:
+    def __init__(self, db: "AsyncClient") -> None:
         self._db = db
 
     def _ref(self, uid: str, story_id: str):
         return self._db.collection("users").document(uid).collection("history").document(story_id)
 
-    def find_all(self, uid: str) -> list[HistoryEntry]:
-        docs = (
+    async def find_all(self, uid: str) -> list[HistoryEntry]:
+        query = (
             self._db.collection("users").document(uid).collection("history")
             .order_by("lastPlayedAt", direction="DESCENDING")
-            .stream()
         )
         return [
             HistoryEntry(
@@ -344,12 +344,12 @@ class FirestoreHistoryRepository(HistoryRepository):
                 completed=d.to_dict().get("completed", False),
                 last_played_at=d.to_dict().get("lastPlayedAt", _now()),
             )
-            for d in docs
+            async for d in query.stream()
         ]
 
-    def upsert(self, uid: str, story_id: str, progress_seconds: int, completed: bool) -> HistoryEntry:
+    async def upsert(self, uid: str, story_id: str, progress_seconds: int, completed: bool) -> HistoryEntry:
         last_played_at = _now()
-        self._ref(uid, story_id).set({
+        await self._ref(uid, story_id).set({
             "progressSeconds": progress_seconds,
             "completed": completed,
             "lastPlayedAt": last_played_at,
@@ -364,7 +364,7 @@ class FirestoreHistoryRepository(HistoryRepository):
 
 
 class FirestoreVoiceRepository(VoiceRepository):
-    def __init__(self, db: "google.cloud.firestore.Client") -> None:
+    def __init__(self, db: "AsyncClient") -> None:
         self._db = db
 
     def _ref(self, uid: str, voice_id: str):
@@ -386,18 +386,17 @@ class FirestoreVoiceRepository(VoiceRepository):
             created_at=d.get("createdAt") or str(d.get("created_at", _now())),
         )
 
-    def find_by_id(self, uid: str, voice_id: str) -> Voice | None:
-        doc = self._ref(uid, voice_id).get()
+    async def find_by_id(self, uid: str, voice_id: str) -> Voice | None:
+        doc = await self._ref(uid, voice_id).get()
         if not doc.exists:
             return None
         return self._voice_from_doc(doc.id, doc.to_dict())
 
-    def find_all(self, uid: str) -> list[Voice]:
-        docs = self._col(uid).stream()
-        return [self._voice_from_doc(d.id, d.to_dict()) for d in docs]
+    async def find_all(self, uid: str) -> list[Voice]:
+        return [self._voice_from_doc(d.id, d.to_dict()) async for d in self._col(uid).stream()]
 
-    def create(self, uid: str, voice: Voice) -> Voice:
-        self._ref(uid, voice.id).set({
+    async def create(self, uid: str, voice: Voice) -> Voice:
+        await self._ref(uid, voice.id).set({
             "name": voice.name,
             "relationship": voice.relationship,
             "elevenLabsVoiceId": voice.eleven_labs_voice_id,
@@ -407,32 +406,35 @@ class FirestoreVoiceRepository(VoiceRepository):
         })
         return voice
 
-    def update(self, uid: str, voice_id: str, data: dict) -> Voice | None:
+    async def update(self, uid: str, voice_id: str, data: dict) -> Voice | None:
         field_map = {
             "eleven_labs_voice_id": "elevenLabsVoiceId",
             "sample_audio_path": "sampleAudioPath",
             "created_at": "createdAt",
         }
         firestore_data = {field_map.get(k, k): v for k, v in data.items()}
-        self._ref(uid, voice_id).update(firestore_data)
-        return self.find_by_id(uid, voice_id)
+        await self._ref(uid, voice_id).update(firestore_data)
+        return await self.find_by_id(uid, voice_id)
 
-    def delete(self, uid: str, voice_id: str) -> None:
-        self._ref(uid, voice_id).delete()
+    async def delete(self, uid: str, voice_id: str) -> None:
+        await self._ref(uid, voice_id).delete()
 
-    def count(self, uid: str) -> int:
-        return len(list(self._col(uid).stream()))
+    async def count(self, uid: str) -> int:
+        count = 0
+        async for _ in self._col(uid).stream():
+            count += 1
+        return count
 
 
 class FirestoreVoiceInviteRepository(VoiceInviteRepository):
-    def __init__(self, db: "google.cloud.firestore.Client") -> None:
+    def __init__(self, db: "AsyncClient") -> None:
         self._db = db
 
     def _ref(self, token: str):
         return self._db.collection("voiceInvites").document(token)
 
-    def find_by_token(self, token: str) -> VoiceInvite | None:
-        doc = self._ref(token).get()
+    async def find_by_token(self, token: str) -> VoiceInvite | None:
+        doc = await self._ref(token).get()
         if not doc.exists:
             return None
         d = doc.to_dict()
@@ -447,8 +449,8 @@ class FirestoreVoiceInviteRepository(VoiceInviteRepository):
             expires_at=d.get("expiresAt", _now()),
         )
 
-    def create(self, invite: VoiceInvite) -> VoiceInvite:
-        self._ref(invite.token).set({
+    async def create(self, invite: VoiceInvite) -> VoiceInvite:
+        await self._ref(invite.token).set({
             "ownerUid": invite.owner_uid,
             "voiceName": invite.voice_name,
             "relationship": invite.relationship,
@@ -459,13 +461,13 @@ class FirestoreVoiceInviteRepository(VoiceInviteRepository):
         })
         return invite
 
-    def mark_used(self, token: str, voice_id: str) -> VoiceInvite | None:
-        self._ref(token).update({"status": "used", "voiceId": voice_id})
-        return self.find_by_token(token)
+    async def mark_used(self, token: str, voice_id: str) -> VoiceInvite | None:
+        await self._ref(token).update({"status": "used", "voiceId": voice_id})
+        return await self.find_by_token(token)
 
 
 class FirestoreConversionRepository(ConversionRepository):
-    def __init__(self, db: "google.cloud.firestore.Client") -> None:
+    def __init__(self, db: "AsyncClient") -> None:
         self._db = db
 
     @staticmethod
@@ -492,18 +494,20 @@ class FirestoreConversionRepository(ConversionRepository):
             updated_at=d.get("updatedAt", _now()),
         )
 
-    def find_by_id(self, uid: str, story_id: str, voice_id: str) -> Conversion | None:
-        doc = self._ref(uid, story_id, voice_id).get()
+    async def find_by_id(self, uid: str, story_id: str, voice_id: str) -> Conversion | None:
+        doc = await self._ref(uid, story_id, voice_id).get()
         if not doc.exists:
             return None
         return self._from_doc(doc)
 
-    def find_all_for_story(self, uid: str, story_id: str) -> list[Conversion]:
-        docs = self._col(uid).where("storyId", "==", story_id).stream()
-        return [self._from_doc(d) for d in docs]
+    async def find_all_for_story(self, uid: str, story_id: str) -> list[Conversion]:
+        return [
+            self._from_doc(d)
+            async for d in self._col(uid).where("storyId", "==", story_id).stream()
+        ]
 
-    def create(self, uid: str, conversion: Conversion) -> Conversion:
-        self._ref(uid, conversion.story_id, conversion.voice_id).set({
+    async def create(self, uid: str, conversion: Conversion) -> Conversion:
+        await self._ref(uid, conversion.story_id, conversion.voice_id).set({
             "storyId": conversion.story_id,
             "voiceId": conversion.voice_id,
             "status": conversion.status,
@@ -515,7 +519,7 @@ class FirestoreConversionRepository(ConversionRepository):
         })
         return conversion
 
-    def update(self, uid: str, story_id: str, voice_id: str, data: dict) -> Conversion | None:
+    async def update(self, uid: str, story_id: str, voice_id: str, data: dict) -> Conversion | None:
         field_map = {
             "story_id": "storyId",
             "voice_id": "voiceId",
@@ -526,14 +530,14 @@ class FirestoreConversionRepository(ConversionRepository):
         }
         firestore_data = {field_map.get(k, k): v for k, v in data.items()}
         firestore_data["updatedAt"] = _now()
-        self._ref(uid, story_id, voice_id).update(firestore_data)
-        return self.find_by_id(uid, story_id, voice_id)
+        await self._ref(uid, story_id, voice_id).update(firestore_data)
+        return await self.find_by_id(uid, story_id, voice_id)
 
 
 def create_firestore_repositories(project_id: str, bucket_name: str, url_ttl_seconds: int) -> Repositories:
-    from google.cloud import firestore as gc_firestore
+    from google.cloud.firestore_v1.async_client import AsyncClient
 
-    db = gc_firestore.Client(project=project_id)
+    db = AsyncClient(project=project_id)
     return Repositories(
         stories=FirestoreStoryRepository(db, bucket_name, url_ttl_seconds),
         users=FirestoreUserRepository(db),

@@ -6,13 +6,6 @@ _NOW = "2024-01-01T00:00:00+00:00"
 _EMB = MockEmbeddingService()
 
 
-def _embed(story: Story) -> list[float]:
-    """Generate a deterministic test embedding from a story's themes."""
-    if not story.themes:
-        return []
-    return _EMB.embed_story(story)
-
-
 STORIES = [
     Story(
         id="the-whispering-pines",
@@ -103,10 +96,10 @@ STORIES = [
     ),
 ]
 
-# Generate embeddings for stories that have themes
+# Generate embeddings for stories that have themes (using sync helper)
 for _s in STORIES:
     if _s.themes:
-        _s.embedding = _embed(_s)
+        _s.embedding = _EMB.embed_story_sync(_s)
 
 USER_ALICE = "uid-alice"
 USER_BOB = "uid-bob"

@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 import os
 from dataclasses import dataclass
 from fastapi import HTTPException, Header
@@ -15,7 +16,7 @@ class AuthenticatedUser:
 _ALLOW_TEST_BYPASS = os.environ.get("ENV", "development") != "production"
 
 
-def get_current_user(
+async def get_current_user(
     authorization: Optional[str] = Header(default=None),
     x_test_uid: Optional[str] = Header(default=None),
     x_test_email: Optional[str] = Header(default=None),
@@ -37,7 +38,7 @@ def get_current_user(
     token = authorization.removeprefix("Bearer ").strip()
     try:
         import firebase_admin.auth as fb_auth
-        decoded = fb_auth.verify_id_token(token)
+        decoded = await asyncio.to_thread(fb_auth.verify_id_token, token)
         return AuthenticatedUser(uid=decoded["uid"], email=decoded.get("email"))
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid or expired token")

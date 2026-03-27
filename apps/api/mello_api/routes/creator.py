@@ -34,13 +34,13 @@ def _now() -> str:
 def make_router(repos: Repositories, services: Services) -> APIRouter:
     router = APIRouter(prefix="/v1/creator")
 
-    def _resolve_story_urls(story: Story) -> StoryWithAudioUrl:
+    async def _resolve_story_urls(story: Story) -> StoryWithAudioUrl:
         audio_url = ""
         cover_art_url = ""
         if story.audio_path:
-            audio_url = repos.stories.get_audio_signed_url(story.id, story.audio_path)
+            audio_url = await repos.stories.get_audio_signed_url(story.id, story.audio_path)
         if story.cover_art_path:
-            cover_art_url = repos.stories.get_cover_art_signed_url(story.id, story.cover_art_path)
+            cover_art_url = await repos.stories.get_cover_art_signed_url(story.id, story.cover_art_path)
         return StoryWithAudioUrl(
             id=story.id,
             title=story.title,
@@ -61,7 +61,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         )
 
     @router.post("/generate", status_code=202)
-    def generate_story(
+    async def generate_story(
         body: GenerateStoryRequest,
         _user: AuthenticatedUser = Depends(get_current_user),
     ):
@@ -90,9 +90,9 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
             created_at=now,
             updated_at=now,
         )
-        repos.stories.create(story)
+        await repos.stories.create(story)
 
-        services.task_queue.enqueue(
+        await services.task_queue.enqueue(
             "generate-story",
             {"storyId": story_id, "prompt": body.prompt},
             dedup_id=story_id,
@@ -101,14 +101,14 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         return {"data": {"id": story_id, "generateStatus": "processing"}}
 
     @router.patch("/stories/{story_id}")
-    def update_draft(
+    async def update_draft(
         story_id: str,
         body: UpdateDraftRequest,
         _user: AuthenticatedUser = Depends(get_current_user),
     ):
         """Edit a draft story's text/metadata before publishing."""
 
-        story = repos.stories.find_by_id_any(story_id)
+        story = await repos.stories.find_by_id_any(story_id)
         if story is None:
             raise HTTPException(status_code=404, detail="Story not found")
         if story.is_published:
@@ -118,7 +118,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         if not update_data:
             raise HTTPException(status_code=400, detail="No fields to update")
 
-        updated = repos.stories.update(story_id, update_data)
+        updated = await repos.stories.update(story_id, update_data)
         return {
             "data": GenerateStoryResponse(
                 id=updated.id,
@@ -133,13 +133,13 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         }
 
     @router.post("/stories/{story_id}/publish", status_code=202)
-    def publish_story(
+    async def publish_story(
         story_id: str,
         _user: AuthenticatedUser = Depends(get_current_user),
     ):
         """Enqueue story publishing as a background task. Returns 202 immediately."""
 
-        story = repos.stories.find_by_id_any(story_id)
+        story = await repos.stories.find_by_id_any(story_id)
         if story is None:
             raise HTTPException(status_code=404, detail="Story not found")
         if story.is_published:
@@ -159,13 +159,13 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
             except (ValueError, TypeError):
                 pass
 
-        repos.stories.update(story_id, {
+        await repos.stories.update(story_id, {
             "publish_status": "processing",
             "publish_step": "queued",
             "publish_error": "",
         })
 
-        services.task_queue.enqueue(
+        await services.task_queue.enqueue(
             "publish-story",
             {"storyId": story_id},
             dedup_id=story_id,
@@ -174,12 +174,12 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         return {"data": {"id": story_id, "publishStatus": "processing"}}
 
     @router.get("/stories/{story_id}/status")
-    def get_story_status(
+    async def get_story_status(
         story_id: str,
         _user: AuthenticatedUser = Depends(get_current_user),
     ):
         """Poll for generate/publish progress."""
-        story = repos.stories.find_by_id_any(story_id)
+        story = await repos.stories.find_by_id_any(story_id)
         if story is None:
             raise HTTPException(status_code=404, detail="Story not found")
         result: dict = {

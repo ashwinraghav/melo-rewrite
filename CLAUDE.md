@@ -60,21 +60,29 @@ Dark theme is the default (and primary) theme.
 **Client state:** TanStack Query for server data. Firebase Auth state via `useAuthContext()`.
 No Redux, no Zustand — keep it simple.
 
-**Route handlers (API):** **NEVER use `async def` for route handlers that call blocking code**
-(Firestore, external HTTP APIs, GCS, Cloud Tasks, etc.). Always use `def` (sync) — FastAPI runs
-sync handlers in a threadpool, keeping the event loop free. Only use `async def` when ALL I/O in
-the handler uses `await`. If you need multipart uploads, use `UploadFile = File(...)` instead of
-`await request.form()`.
+**Route handlers (API):** **ALL route handlers MUST be `async def`** — no exceptions. All I/O
+(Firestore, external HTTP APIs, GCS, Cloud Tasks, etc.) uses native async clients or
+`asyncio.to_thread()` wrappers. Never call blocking functions directly from a handler —
+wrap them with `asyncio.to_thread()` if no async client exists. If you add a new endpoint,
+it MUST be `async def`.
 
-**Client initialization (API):** All external clients (GCS, Firestore, Cloud Tasks, Anthropic,
-Cohere, Vertex AI, ElevenLabs) MUST be created once in `__init__` and reused — never recreated
-per request or per method call. Use `requests.Session` (not bare `requests.post()`) for HTTP APIs
-to get connection pooling. All Google Cloud, Anthropic, and Cohere clients are thread-safe.
+**Client initialization (API):** All external clients MUST be created once in `__init__` and
+reused. Use `httpx.AsyncClient` (not `requests`) for HTTP APIs. Use async variants:
+`anthropic.AsyncAnthropic`, `cohere.AsyncClientV2`, `client.aio.models` for Google GenAI,
+`google.cloud.firestore_v1.async_client.AsyncClient` for Firestore,
+`google.cloud.tasks_v2.CloudTasksAsyncClient` for Cloud Tasks. Never import or use `requests`.
 
 **Background tasks (API):** Long-running operations (story generation, publishing, voice cloning,
 story conversion) are offloaded via Cloud Tasks to `/internal/tasks/` endpoints on the same
 Cloud Run service. User-facing endpoints return 202 immediately; frontends poll a status endpoint.
-Task handlers in `routes/tasks.py` must be `def` (sync), not `async def`.
+Task handlers in `routes/tasks.py` are `async def`, just like all other handlers. They await
+async service methods. Never use `time.sleep()` — use `await asyncio.sleep()`.
+
+**Async guard (API):** asyncio debug mode is enabled with a 100ms slow-callback threshold.
+In tests, slow callbacks are converted to errors. Ruff's `ASYNC` rules are enabled. NEVER
+use `requests`, `time.sleep()`, or sync Firestore/GCS/Cloud Tasks clients in `mello_api/` code.
+The only acceptable sync-to-async bridge is `asyncio.to_thread()` for libraries that lack
+async clients (Firebase Auth `verify_id_token`, GCS `generate_signed_url`, Firebase Storage).
 
 ## Adding a new API endpoint
 

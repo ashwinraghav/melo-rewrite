@@ -13,6 +13,7 @@ Generated files:
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from abc import ABC, abstractmethod
@@ -59,7 +60,7 @@ def _story_to_detail(story: Story, bucket_name: str) -> dict:
 
 class CatalogPublisherService(ABC):
     @abstractmethod
-    def publish_catalog(self, stories: list[Story]) -> int:
+    async def publish_catalog(self, stories: list[Story]) -> int:
         """Regenerate all catalog JSON files. Returns number of files written."""
         ...
 
@@ -69,28 +70,29 @@ class GcsCatalogPublisher(CatalogPublisherService):
         self._bucket_name = bucket_name
         self._gcs_client = gcs.Client(project=gcp_project_id)
 
-    def _upload_json(self, path: str, data: dict | list) -> None:
+    async def _upload_json(self, path: str, data: dict | list) -> None:
         bucket = self._gcs_client.bucket(self._bucket_name)
         blob = bucket.blob(path)
-        blob.upload_from_string(
-            json.dumps(data, separators=(",", ":")),
-            content_type="application/json",
-        )
-        blob.cache_control = "public, max-age=60, stale-while-revalidate=300"
-        blob.patch()
+        content = json.dumps(data, separators=(",", ":"))
 
-    def publish_catalog(self, stories: list[Story]) -> int:
+        def _do_upload():
+            blob.upload_from_string(content, content_type="application/json")
+            blob.cache_control = "public, max-age=60, stale-while-revalidate=300"
+            blob.patch()
+
+        await asyncio.to_thread(_do_upload)
+
+    async def publish_catalog(self, stories: list[Story]) -> int:
         published = [s for s in stories if s.is_published]
-        files_written = 0
+        uploads = []
 
         # 1. Full catalog (list view)
         all_items = [_story_to_list_item(s, self._bucket_name) for s in published]
-        self._upload_json("catalog/stories.json", {
+        uploads.append(self._upload_json("catalog/stories.json", {
             "data": all_items,
             "total": len(all_items),
             "hasMore": False,
-        })
-        files_written += 1
+        }))
 
         # 2. Per-topic lists
         topics: dict[str, list[dict]] = {}
@@ -100,20 +102,21 @@ class GcsCatalogPublisher(CatalogPublisherService):
                     _story_to_list_item(story, self._bucket_name)
                 )
         for topic, items in topics.items():
-            self._upload_json(f"catalog/topics/{topic}.json", {
+            uploads.append(self._upload_json(f"catalog/topics/{topic}.json", {
                 "data": items,
                 "total": len(items),
                 "hasMore": False,
-            })
-            files_written += 1
+            }))
 
         # 3. Individual story details
         for story in published:
             detail = _story_to_detail(story, self._bucket_name)
-            self._upload_json(f"catalog/stories/{story.id}.json", {
+            uploads.append(self._upload_json(f"catalog/stories/{story.id}.json", {
                 "data": detail,
-            })
-            files_written += 1
+            }))
+
+        await asyncio.gather(*uploads)
+        files_written = len(uploads)
 
         log.info("Published catalog: %d files for %d stories", files_written, len(published))
         return files_written
@@ -125,6 +128,6 @@ class MockCatalogPublisher(CatalogPublisherService):
     def __init__(self) -> None:
         self.last_count = 0
 
-    def publish_catalog(self, stories: list[Story]) -> int:
+    async def publish_catalog(self, stories: list[Story]) -> int:
         self.last_count = len([s for s in stories if s.is_published])
         return self.last_count

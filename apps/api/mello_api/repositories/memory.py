@@ -26,20 +26,20 @@ class MemoryStoryRepository(StoryRepository):
     def seed(self, stories: list[Story]) -> None:
         self._stories = {s.id: s for s in stories}
 
-    def find_by_id(self, story_id: str) -> Story | None:
+    async def find_by_id(self, story_id: str) -> Story | None:
         story = self._stories.get(story_id)
         if story is None or not story.is_published:
             return None
         return story
 
-    def find_by_id_any(self, story_id: str) -> Story | None:
+    async def find_by_id_any(self, story_id: str) -> Story | None:
         return self._stories.get(story_id)
 
-    def create(self, story: Story) -> Story:
+    async def create(self, story: Story) -> Story:
         self._stories[story.id] = story
         return story
 
-    def update(self, story_id: str, data: dict) -> Story | None:
+    async def update(self, story_id: str, data: dict) -> Story | None:
         story = self._stories.get(story_id)
         if story is None:
             return None
@@ -48,7 +48,7 @@ class MemoryStoryRepository(StoryRepository):
         self._stories[story_id] = updated
         return updated
 
-    def find_many(self, filters: StoryFilters) -> list[Story]:
+    async def find_many(self, filters: StoryFilters) -> list[Story]:
         results = [s for s in self._stories.values() if s.is_published]
 
         if filters.topics:
@@ -62,7 +62,7 @@ class MemoryStoryRepository(StoryRepository):
 
         return results
 
-    def vector_search(self, query_embedding: list[float], limit: int = 20) -> list[tuple[Story, float]]:
+    async def vector_search(self, query_embedding: list[float], limit: int = 20) -> list[tuple[Story, float]]:
         """In-memory cosine similarity for tests."""
         import math
 
@@ -79,16 +79,16 @@ class MemoryStoryRepository(StoryRepository):
         scored.sort(key=lambda x: x[1], reverse=True)
         return scored[:limit]
 
-    def get_audio_signed_url(self, story_id: str, audio_path: str) -> str:
+    async def get_audio_signed_url(self, story_id: str, audio_path: str) -> str:
         return f"https://storage.example.com/{audio_path}?signed=1"
 
-    def get_cover_art_signed_url(self, story_id: str, cover_art_path: str) -> str:
+    async def get_cover_art_signed_url(self, story_id: str, cover_art_path: str) -> str:
         return f"https://storage.example.com/{cover_art_path}?signed=1"
 
-    def get_cover_art_public_url(self, cover_art_path: str) -> str:
+    async def get_cover_art_public_url(self, cover_art_path: str) -> str:
         return f"https://storage.googleapis.com/test-bucket/{cover_art_path}"
 
-    def get_audio_public_url(self, audio_path: str) -> str:
+    async def get_audio_public_url(self, audio_path: str) -> str:
         return f"https://storage.googleapis.com/test-bucket/{audio_path}"
 
 
@@ -96,14 +96,14 @@ class MemoryUserRepository(UserRepository):
     def __init__(self) -> None:
         self._users: dict[str, UserProfile] = {}
 
-    def find_by_id(self, uid: str) -> UserProfile | None:
+    async def find_by_id(self, uid: str) -> UserProfile | None:
         return deepcopy(self._users.get(uid))
 
-    def create(self, profile: UserProfile) -> UserProfile:
+    async def create(self, profile: UserProfile) -> UserProfile:
         self._users[profile.uid] = deepcopy(profile)
         return deepcopy(profile)
 
-    def update(self, uid: str, data: dict) -> UserProfile:
+    async def update(self, uid: str, data: dict) -> UserProfile:
         profile = self._users.get(uid)
         if profile is None:
             raise ValueError(f"User {uid} not found")
@@ -118,14 +118,14 @@ class MemoryFavoriteRepository(FavoriteRepository):
     def __init__(self) -> None:
         self._favorites: dict[str, dict[str, Favorite]] = {}  # uid → {storyId → Favorite}
 
-    def find_all(self, uid: str) -> list[Favorite]:
+    async def find_all(self, uid: str) -> list[Favorite]:
         return sorted(
             self._favorites.get(uid, {}).values(),
             key=lambda f: f.created_at,
             reverse=True,
         )
 
-    def add(self, uid: str, story_id: str) -> Favorite:
+    async def add(self, uid: str, story_id: str) -> Favorite:
         if uid not in self._favorites:
             self._favorites[uid] = {}
         if story_id not in self._favorites[uid]:
@@ -134,10 +134,10 @@ class MemoryFavoriteRepository(FavoriteRepository):
             )
         return self._favorites[uid][story_id]
 
-    def remove(self, uid: str, story_id: str) -> None:
+    async def remove(self, uid: str, story_id: str) -> None:
         self._favorites.get(uid, {}).pop(story_id, None)
 
-    def exists(self, uid: str, story_id: str) -> bool:
+    async def exists(self, uid: str, story_id: str) -> bool:
         return story_id in self._favorites.get(uid, {})
 
 
@@ -145,14 +145,14 @@ class MemoryHistoryRepository(HistoryRepository):
     def __init__(self) -> None:
         self._history: dict[str, dict[str, HistoryEntry]] = {}  # uid → {storyId → Entry}
 
-    def find_all(self, uid: str) -> list[HistoryEntry]:
+    async def find_all(self, uid: str) -> list[HistoryEntry]:
         return sorted(
             self._history.get(uid, {}).values(),
             key=lambda e: e.last_played_at,
             reverse=True,
         )
 
-    def upsert(self, uid: str, story_id: str, progress_seconds: int, completed: bool) -> HistoryEntry:
+    async def upsert(self, uid: str, story_id: str, progress_seconds: int, completed: bool) -> HistoryEntry:
         if uid not in self._history:
             self._history[uid] = {}
         entry = HistoryEntry(
@@ -170,19 +170,19 @@ class MemoryVoiceRepository(VoiceRepository):
     def __init__(self) -> None:
         self._voices: dict[str, dict[str, Voice]] = {}  # uid → {voiceId → Voice}
 
-    def find_by_id(self, uid: str, voice_id: str) -> Voice | None:
+    async def find_by_id(self, uid: str, voice_id: str) -> Voice | None:
         return self._voices.get(uid, {}).get(voice_id)
 
-    def find_all(self, uid: str) -> list[Voice]:
+    async def find_all(self, uid: str) -> list[Voice]:
         return list(self._voices.get(uid, {}).values())
 
-    def create(self, uid: str, voice: Voice) -> Voice:
+    async def create(self, uid: str, voice: Voice) -> Voice:
         if uid not in self._voices:
             self._voices[uid] = {}
         self._voices[uid][voice.id] = voice
         return voice
 
-    def update(self, uid: str, voice_id: str, data: dict) -> Voice | None:
+    async def update(self, uid: str, voice_id: str, data: dict) -> Voice | None:
         voice = self._voices.get(uid, {}).get(voice_id)
         if voice is None:
             return None
@@ -190,10 +190,10 @@ class MemoryVoiceRepository(VoiceRepository):
         self._voices[uid][voice_id] = updated
         return updated
 
-    def delete(self, uid: str, voice_id: str) -> None:
+    async def delete(self, uid: str, voice_id: str) -> None:
         self._voices.get(uid, {}).pop(voice_id, None)
 
-    def count(self, uid: str) -> int:
+    async def count(self, uid: str) -> int:
         return len(self._voices.get(uid, {}))
 
 
@@ -201,14 +201,14 @@ class MemoryVoiceInviteRepository(VoiceInviteRepository):
     def __init__(self) -> None:
         self._invites: dict[str, VoiceInvite] = {}  # token → VoiceInvite
 
-    def find_by_token(self, token: str) -> VoiceInvite | None:
+    async def find_by_token(self, token: str) -> VoiceInvite | None:
         return self._invites.get(token)
 
-    def create(self, invite: VoiceInvite) -> VoiceInvite:
+    async def create(self, invite: VoiceInvite) -> VoiceInvite:
         self._invites[invite.token] = invite
         return invite
 
-    def mark_used(self, token: str, voice_id: str) -> VoiceInvite | None:
+    async def mark_used(self, token: str, voice_id: str) -> VoiceInvite | None:
         invite = self._invites.get(token)
         if invite is None:
             return None
@@ -226,23 +226,23 @@ class MemoryConversionRepository(ConversionRepository):
     def _key(story_id: str, voice_id: str) -> str:
         return f"{story_id}_{voice_id}"
 
-    def find_by_id(self, uid: str, story_id: str, voice_id: str) -> Conversion | None:
+    async def find_by_id(self, uid: str, story_id: str, voice_id: str) -> Conversion | None:
         return self._conversions.get(uid, {}).get(self._key(story_id, voice_id))
 
-    def find_all_for_story(self, uid: str, story_id: str) -> list[Conversion]:
+    async def find_all_for_story(self, uid: str, story_id: str) -> list[Conversion]:
         return [
             c for c in self._conversions.get(uid, {}).values()
             if c.story_id == story_id
         ]
 
-    def create(self, uid: str, conversion: Conversion) -> Conversion:
+    async def create(self, uid: str, conversion: Conversion) -> Conversion:
         if uid not in self._conversions:
             self._conversions[uid] = {}
         key = self._key(conversion.story_id, conversion.voice_id)
         self._conversions[uid][key] = conversion
         return conversion
 
-    def update(self, uid: str, story_id: str, voice_id: str, data: dict) -> Conversion | None:
+    async def update(self, uid: str, story_id: str, voice_id: str, data: dict) -> Conversion | None:
         key = self._key(story_id, voice_id)
         conversion = self._conversions.get(uid, {}).get(key)
         if conversion is None:

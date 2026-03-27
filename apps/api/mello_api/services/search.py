@@ -29,9 +29,9 @@ RETRIEVAL_K = 20  # candidates from vector search
 class SearchService:
     def __init__(self, embedding_service: "EmbeddingService", cohere_api_key: str = "") -> None:
         self._embedding = embedding_service
-        self._cohere = cohere.ClientV2(api_key=cohere_api_key) if cohere_api_key else None
+        self._cohere = cohere.AsyncClientV2(api_key=cohere_api_key) if cohere_api_key else None
 
-    def search(
+    async def search(
         self,
         query: str,
         story_repo: "StoryRepository",
@@ -39,10 +39,10 @@ class SearchService:
         limit: int = 10,
     ) -> list[tuple["Story", float]]:
         # Embed query
-        query_embedding = self._embedding.embed_text(query)
+        query_embedding = await self._embedding.embed_text(query)
 
         # Firestore KNN vector search — returns top candidates
-        candidates = story_repo.vector_search(query_embedding, limit=RETRIEVAL_K)
+        candidates = await story_repo.vector_search(query_embedding, limit=RETRIEVAL_K)
 
         # Filter by child age in-memory (Firestore vector search doesn't support
         # compound filters with inequality on other fields)
@@ -57,12 +57,12 @@ class SearchService:
 
         # Cohere rerank for better relevance
         if self._cohere:
-            return self._rerank(query, candidates, limit)
+            return await self._rerank(query, candidates, limit)
 
         # Fallback: return vector search results directly
         return candidates[:limit]
 
-    def _rerank(
+    async def _rerank(
         self,
         query: str,
         candidates: list[tuple["Story", float]],
@@ -73,7 +73,7 @@ class SearchService:
                 f"{story.title}. {story.description}. {story.themes}"
                 for story, _ in candidates
             ]
-            response = self._cohere.rerank(
+            response = await self._cohere.rerank(
                 model="rerank-v3.5",
                 query=query,
                 documents=documents,
