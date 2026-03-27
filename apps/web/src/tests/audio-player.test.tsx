@@ -75,4 +75,22 @@ describe('AudioPlayer', () => {
     render(<AudioPlayer {...DEFAULT_PROPS} durationSeconds={3660} />) // 61 min
     expect(screen.getByText('61:00')).toBeInTheDocument()
   })
+
+  it('renders speed control inline with time display', () => {
+    render(<AudioPlayer {...DEFAULT_PROPS} />)
+    const speedButton = screen.getByRole('button', { name: /playback speed/i })
+    expect(speedButton).toBeInTheDocument()
+    expect(speedButton).toHaveTextContent('1x')
+  })
+
+  it('cycles speed on click', () => {
+    render(<AudioPlayer {...DEFAULT_PROPS} />)
+    const speedButton = screen.getByRole('button', { name: /playback speed/i })
+    fireEvent.click(speedButton)
+    expect(speedButton).toHaveTextContent('1.25x')
+    fireEvent.click(speedButton)
+    expect(speedButton).toHaveTextContent('0.75x')
+    fireEvent.click(speedButton)
+    expect(speedButton).toHaveTextContent('1x')
+  })
 })

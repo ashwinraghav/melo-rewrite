@@ -160,19 +160,6 @@ export function AudioPlayer({
     <div className="w-full" role="region" aria-label="Audio player">
       <audio ref={audioRef} src={audioUrl} preload="metadata" />
 
-      {/* Narrator label + speed control */}
-      <div className="mb-4 flex items-center justify-center gap-3">
-        <Icon name="record_voice_over" size={16} className="text-on-surface-variant" />
-        <span className="font-body text-xs text-on-surface-variant">Gentle Voice</span>
-        <button
-          onClick={cycleSpeed}
-          className="ml-2 rounded-full bg-surface-container-high/60 px-2.5 py-1 font-body text-xs font-medium text-on-surface-variant transition-all hover:bg-surface-container-highest/60 active:scale-95"
-          aria-label={`Playback speed: ${speed}x`}
-        >
-          {speed}x
-        </button>
-      </div>
-
       {/* Progress bar */}
       <div className="relative mb-2 h-1 w-full">
         <div className="absolute inset-0 rounded-full bg-outline-variant/30" />
@@ -196,31 +183,38 @@ export function AudioPlayer({
         />
       </div>
 
-      {/* Time */}
-      <div className="mb-5 flex justify-between font-body text-xs text-on-surface-variant">
+      {/* Time + speed */}
+      <div className="mb-3 flex items-center justify-between font-body text-xs text-on-surface-variant">
         <span>{formatTime(currentTime)}</span>
+        <button
+          onClick={cycleSpeed}
+          className="rounded-full bg-surface-container-high/60 px-2.5 py-0.5 font-medium transition-all hover:bg-surface-container-highest/60 active:scale-95"
+          aria-label={`Playback speed: ${speed}x`}
+        >
+          {speed}x
+        </button>
         <span>{formatTime(durationSeconds)}</span>
       </div>
 
       {/* Controls */}
-      <div className="flex items-center justify-center gap-8">
+      <div className="flex items-center justify-center gap-6">
         <button
           onClick={() => {
             if (audioRef.current) audioRef.current.currentTime = Math.max(0, currentTime - 10)
           }}
-          className="flex h-12 w-12 items-center justify-center rounded-full text-on-surface-variant transition-all hover:text-on-surface active:scale-95"
+          className="flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant transition-all hover:text-on-surface active:scale-95"
           aria-label="Rewind 10 seconds"
         >
-          <Icon name="replay_10" size={28} />
+          <Icon name="replay_10" size={26} />
         </button>
 
         <button
           onClick={togglePlay}
           disabled={!isReady}
-          className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-on-primary transition-all duration-300 hover:brightness-110 active:scale-95 disabled:opacity-40"
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-on-primary transition-all duration-300 hover:brightness-110 active:scale-95 disabled:opacity-40"
           aria-label={isPlaying ? 'Pause' : 'Play'}
         >
-          <Icon name={isPlaying ? 'pause' : 'play_arrow'} size={32} filled />
+          <Icon name={isPlaying ? 'pause' : 'play_arrow'} size={28} filled />
         </button>
 
         <button
@@ -228,10 +222,10 @@ export function AudioPlayer({
             if (audioRef.current)
               audioRef.current.currentTime = Math.min(durationSeconds, currentTime + 10)
           }}
-          className="flex h-12 w-12 items-center justify-center rounded-full text-on-surface-variant transition-all hover:text-on-surface active:scale-95"
+          className="flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant transition-all hover:text-on-surface active:scale-95"
           aria-label="Skip forward 10 seconds"
         >
-          <Icon name="forward_10" size={28} />
+          <Icon name="forward_10" size={26} />
         </button>
       </div>
     </div>

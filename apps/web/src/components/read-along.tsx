@@ -42,8 +42,11 @@ export function ReadAlong({ segments, currentTime, isPlaying }: ReadAlongProps) 
 
     // How far the element is from the container's visible top, plus current scroll
     const elTopInContainer = elRect.top - containerRect.top + container.scrollTop
-    const target = elTopInContainer - container.clientHeight / 2 + elRect.height / 2
-    container.scrollTo({ top: target, behavior: 'smooth' })
+    const centered = elTopInContainer - container.clientHeight / 2 + elRect.height / 2
+    // Never scroll past the element's top — prevents cropping when a sentence
+    // wraps to more lines than the container can show
+    const target = Math.min(centered, elTopInContainer)
+    container.scrollTo({ top: Math.max(0, target), behavior: 'smooth' })
   }, [activeIndex])
 
   if (segments.length === 0) return null
@@ -51,7 +54,7 @@ export function ReadAlong({ segments, currentTime, isPlaying }: ReadAlongProps) 
   return (
     <div
       ref={containerRef}
-      className="no-scrollbar max-h-[40vh] overflow-y-auto px-2 py-4"
+      className="no-scrollbar h-full overflow-y-auto px-2 pt-1 pb-4"
     >
       <p className="font-body text-base leading-[2] tracking-wide">
         {segments.map((seg, i) => {

@@ -18,6 +18,7 @@ import { AudioPlayer } from '@/components/audio-player'
 import { ReadAlong } from '@/components/read-along'
 import { PersonalizeSheet } from '@/components/personalize-sheet'
 import { Icon } from '@/components/icon'
+import { cn } from '@/lib/cn'
 import type { StoryWithAudioUrl, PaginatedResponse, StorySegment } from '@mello/types'
 import { COMPLETION_THRESHOLD } from '@mello/types'
 
@@ -34,19 +35,24 @@ export function PlayerContent() {
   const [currentTime, setCurrentTime] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
 
-  // Voice personalization state
+  // Compact mode — cover shrinks after 3s of playback to give text more room
+  const [compact, setCompact] = useState(false)
+  useEffect(() => {
+    if (currentTime >= 3) setCompact(true)
+  }, [currentTime])
+
+  // Voice personalization state — null means "use original narrator"
   const [showPersonalize, setShowPersonalize] = useState(false)
-  const [activeVoiceId, setActiveVoiceId] = useState<string | null>(null)
-  const [activeVoiceName, setActiveVoiceName] = useState<string | null>(null)
-  const [overrideAudioUrl, setOverrideAudioUrl] = useState<string | null>(null)
-  const [overrideSegments, setOverrideSegments] = useState<StorySegment[] | null>(null)
+  const [voiceOverride, setVoiceOverride] = useState<{
+    voiceId: string
+    voiceName: string
+    audioUrl: string
+    segments: StorySegment[]
+  } | null>(null)
 
   const handleVoiceChange = useCallback(
     (voiceId: string | null, voiceName: string | null, audioUrl: string, segments: StorySegment[]) => {
-      setActiveVoiceId(voiceId)
-      setActiveVoiceName(voiceId ? voiceName : null)
-      setOverrideAudioUrl(voiceId ? audioUrl : null)
-      setOverrideSegments(voiceId ? segments : null)
+      setVoiceOverride(voiceId ? { voiceId, voiceName: voiceName!, audioUrl, segments } : null)
       setShowPersonalize(false)
     },
     [],
@@ -91,7 +97,7 @@ export function PlayerContent() {
         queryFn: () => fetchStoryDetail<StoryWithAudioUrl>(prevStory.id),
       })
     }
-  }, [nextStory?.id, prevStory?.id, client, queryClient])
+  }, [nextStory?.id, prevStory?.id, queryClient])
 
   // Keep URL in sync for deep-linking without triggering re-render
   useEffect(() => {
@@ -121,11 +127,8 @@ export function PlayerContent() {
   const switchTrack = useCallback((storyId: string) => {
     setCurrentTime(0)
     setCurrentId(storyId)
-    // Reset voice override on track change
-    setActiveVoiceId(null)
-    setActiveVoiceName(null)
-    setOverrideAudioUrl(null)
-    setOverrideSegments(null)
+    setVoiceOverride(null)
+    setCompact(false)
   }, [])
 
   const handleEnded = useCallback(() => {
@@ -174,11 +177,11 @@ export function PlayerContent() {
     )
   }
 
-  const segments = overrideSegments ?? story.segments ?? []
-  const audioUrl = overrideAudioUrl ?? story.audioUrl
+  const segments = voiceOverride?.segments ?? story.segments ?? []
+  const audioUrl = voiceOverride?.audioUrl ?? story.audioUrl
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex h-dvh flex-col overflow-hidden">
       {/* Top bar */}
       <div className="flex items-center justify-between px-4 pt-4">
         <button
@@ -200,7 +203,7 @@ export function PlayerContent() {
         <div className="w-10" />
       </div>
 
-      {/* Story info — animates on track change */}
+      {/* Story info — animates on track change, compacts after 3s */}
       <AnimatePresence mode="wait">
         <motion.div
           key={currentId}
@@ -210,44 +213,72 @@ export function PlayerContent() {
           transition={{ duration: 0.25 }}
           className="px-6 pt-6"
         >
-          {/* Cover art */}
+          {/* Cover art — shrinks in compact mode */}
           {story.coverArtUrl && (
-            <div className="mx-auto mb-5 h-48 w-48 overflow-hidden rounded-2xl bg-surface-container-high shadow-lg shadow-surface-container-lowest/20">
+            <motion.div
+              animate={{
+                width: compact ? 80 : 192,
+                height: compact ? 80 : 192,
+              }}
+              transition={{ duration: 0.7, ease: [0.32, 0.72, 0, 1] }}
+              className={cn(
+                "mx-auto shrink-0 overflow-hidden rounded-2xl bg-surface-container-high shadow-lg shadow-surface-container-lowest/20 transition-[margin] duration-700",
+                compact ? "mb-3" : "mb-5",
+              )}
+            >
               <img
                 src={story.coverArtUrl}
                 alt={story.title}
                 className="h-full w-full object-cover"
               />
-            </div>
+            </motion.div>
           )}
-          <div className="mb-2 flex flex-wrap gap-1.5">
-            {story.topics.map((topic) => (
-              <span
-                key={topic}
-                className="rounded-full bg-primary/15 px-3 py-1 font-body text-xs text-primary"
-              >
-                {topic}
-              </span>
-            ))}
+
+          {/* Chips — collapse in compact */}
+          <div className={cn(
+            "overflow-hidden transition-all duration-700",
+            compact ? "max-h-0 opacity-0" : "max-h-20 opacity-100",
+          )}>
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {story.topics.map((topic) => (
+                <span
+                  key={topic}
+                  className="rounded-full bg-primary/15 px-3 py-1 font-body text-xs text-primary"
+                >
+                  {topic}
+                </span>
+              ))}
+            </div>
           </div>
-          <h1 className="font-display text-2xl font-semibold text-on-surface">
+
+          <h1 className={cn(
+            "font-display font-semibold text-on-surface transition-all duration-700",
+            compact ? "text-base" : "text-2xl",
+          )}>
             {story.title}
           </h1>
-          <p className="mt-1 text-sm text-on-surface-variant">{story.description}</p>
 
-          {/* Personalize button — only shows if user has voices */}
+          {/* Description — collapse in compact */}
+          <div className={cn(
+            "overflow-hidden transition-all duration-700",
+            compact ? "max-h-0 opacity-0" : "max-h-24 opacity-100",
+          )}>
+            <p className="mt-1 text-sm text-on-surface-variant">{story.description}</p>
+          </div>
+
+          {/* Personalize button */}
           <button
             onClick={() => setShowPersonalize(true)}
             className="mt-3 flex items-center gap-1.5 rounded-full bg-surface-container-high/60 px-3 py-1.5 font-body text-xs text-on-surface-variant transition-all hover:bg-surface-container-highest/60"
           >
             <Icon name="record_voice_over" size={14} />
-            {activeVoiceName ? `Narrated by ${activeVoiceName}` : 'Personalize voice'}
+            {voiceOverride ? `Narrated by ${voiceOverride.voiceName}` : 'Personalize voice'}
           </button>
         </motion.div>
       </AnimatePresence>
 
       {/* Read-along text — animates on track change */}
-      <div className="flex-1 px-6 pt-4">
+      <div className="min-h-0 flex-1 overflow-hidden px-6 pt-4">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentId}
@@ -255,6 +286,7 @@ export function PlayerContent() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
+            className="h-full"
           >
             {segments.length > 0 && (
               <ReadAlong
@@ -292,7 +324,7 @@ export function PlayerContent() {
       )}
 
       {/* Audio player — stays mounted, handles src changes internally */}
-      <div className="player-bar px-6 pb-8 pt-4">
+      <div className="player-bar px-6 pb-6 pt-2">
         <AudioPlayer
           audioUrl={audioUrl}
           durationSeconds={story.durationSeconds}
@@ -311,7 +343,7 @@ export function PlayerContent() {
         storyId={currentId}
         originalAudioUrl={story.audioUrl}
         originalSegments={story.segments ?? []}
-        activeVoiceId={activeVoiceId}
+        activeVoiceId={voiceOverride?.voiceId ?? null}
         onVoiceChange={handleVoiceChange}
       />
     </div>
