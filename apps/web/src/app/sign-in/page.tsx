@@ -67,19 +67,14 @@ export default function SignInPage() {
         style={{ opacity: 1 }}
         className="w-full max-w-sm"
       >
-        {/* Storybook icon */}
-        <div className="mb-6 flex justify-center">
-          <div className="flex h-20 w-20 items-center justify-center rounded-[2rem] bg-primary/10">
-            <Icon name="auto_stories" size={40} className="text-primary" />
-          </div>
+        {/* Logo — full wordmark as the hero brand moment */}
+        <div className="mb-4 flex justify-center">
+          <img src="/logo.png" alt="Mello" className="h-20 w-auto opacity-90" />
         </div>
 
         {/* Headline */}
         <div className="mb-10 text-center">
-          <h1 className="font-display text-4xl font-semibold tracking-tight text-on-surface">
-            Start Your Journey
-          </h1>
-          <p className="mt-3 font-body text-sm text-on-surface-variant">
+          <p className="font-body text-sm text-on-surface-variant">
             Quiet stories for peaceful nights
           </p>
         </div>

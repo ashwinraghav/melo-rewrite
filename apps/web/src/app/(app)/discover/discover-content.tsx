@@ -26,11 +26,11 @@ export function DiscoverContent() {
     <div className="px-6 py-8 pb-28">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-        <div className="mb-1 flex items-center gap-3">
-          <Icon name="auto_stories" size={28} className="text-primary" />
-          <h1 className="font-display text-2xl font-bold tracking-tight text-on-surface">
-            Storybook
-          </h1>
+        <div className="mb-1 flex items-center gap-2.5">
+          <img src="/icon-v2.png" alt="" className="h-11 w-11" />
+          <span className="font-display text-xl font-bold tracking-tight text-on-surface">
+            Mello
+          </span>
         </div>
 
         <h2 className="mt-6 font-display text-xl font-semibold text-on-surface">

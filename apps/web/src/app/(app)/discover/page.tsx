@@ -6,9 +6,9 @@ function DiscoverSkeleton() {
     <div className="px-6 py-8 pb-28">
       {/* Header */}
       <div className="mb-8">
-        <div className="mb-1 flex items-center gap-3">
-          <div className="h-7 w-7 animate-pulse rounded bg-surface-container-high" />
-          <div className="h-7 w-32 animate-pulse rounded bg-surface-container-high" />
+        <div className="mb-1 flex items-center gap-2.5">
+          <div className="h-9 w-9 animate-pulse rounded-lg bg-surface-container-high" />
+          <div className="h-6 w-16 animate-pulse rounded bg-surface-container-high" />
         </div>
         <div className="mt-6 h-6 w-40 animate-pulse rounded bg-surface-container-high" />
         <div className="mt-2 h-4 w-64 animate-pulse rounded bg-surface-container-high" />
