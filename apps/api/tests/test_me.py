@@ -60,3 +60,47 @@ def test_users_are_isolated(client):
     r_alice = client.get("/v1/me", headers=auth(USER_ALICE, "alice@example.com"))
     r_bob = client.get("/v1/me", headers=auth(USER_BOB, "bob@example.com"))
     assert r_alice.json()["data"]["uid"] != r_bob.json()["data"]["uid"]
+
+
+# ── Terms acceptance ────────────────────────────────────────────────────────
+
+def test_accept_terms_requires_auth(client):
+    r = client.post("/v1/me/accept-terms", json={"termsVersion": "1.0"})
+    assert r.status_code == 401
+
+
+def test_accept_terms_records_version_and_timestamp(client):
+    client.get("/v1/me", headers=auth(USER_ALICE))
+    r = client.post("/v1/me/accept-terms", json={"termsVersion": "1.0"}, headers=auth(USER_ALICE))
+    assert r.status_code == 200
+    data = r.json()["data"]
+    assert data["termsVersion"] == "1.0"
+    assert data["termsAcceptedAt"] is not None
+
+
+def test_accept_terms_persists_on_profile(client):
+    client.get("/v1/me", headers=auth(USER_ALICE))
+    client.post("/v1/me/accept-terms", json={"termsVersion": "1.0"}, headers=auth(USER_ALICE))
+    r = client.get("/v1/me", headers=auth(USER_ALICE))
+    data = r.json()["data"]
+    assert data["termsVersion"] == "1.0"
+    assert data["termsAcceptedAt"] is not None
+
+
+def test_accept_terms_rejects_wrong_version(client):
+    client.get("/v1/me", headers=auth(USER_ALICE))
+    r = client.post("/v1/me/accept-terms", json={"termsVersion": "99.0"}, headers=auth(USER_ALICE))
+    assert r.status_code == 400
+
+
+def test_accept_terms_rejects_empty_version(client):
+    client.get("/v1/me", headers=auth(USER_ALICE))
+    r = client.post("/v1/me/accept-terms", json={"termsVersion": ""}, headers=auth(USER_ALICE))
+    assert r.status_code == 422
+
+
+def test_new_profile_has_null_terms(client):
+    r = client.get("/v1/me", headers=auth(USER_ALICE))
+    data = r.json()["data"]
+    assert data["termsVersion"] is None
+    assert data["termsAcceptedAt"] is None

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from ..middleware.auth import get_current_user, AuthenticatedUser
 from ..repositories.interfaces import Repositories
-from ..models.user import UserProfile, UpdateProfileBody
+from ..models.user import UserProfile, UpdateProfileBody, AcceptTermsBody, CURRENT_TERMS_VERSION
 from ..models.story import Story, StoryWithAudioUrl, categorize_duration
 
 
@@ -58,6 +58,17 @@ def make_router(repos: Repositories) -> APIRouter:
         # Only pass fields that were explicitly included in the request body
         update_data = {k: v for k, v in body.model_dump().items() if v is not None or k in body.model_fields_set}
         updated = repos.users.update(user.uid, update_data)
+        return {"data": updated.model_dump(by_alias=True)}
+
+    @router.post("/accept-terms")
+    def accept_terms(body: AcceptTermsBody, user: AuthenticatedUser = Depends(get_current_user)):
+        _ensure_profile(user.uid, user.email)
+        if body.terms_version != CURRENT_TERMS_VERSION:
+            raise HTTPException(status_code=400, detail=f"Invalid terms version. Current version is {CURRENT_TERMS_VERSION}")
+        updated = repos.users.update(user.uid, {
+            "terms_version": body.terms_version,
+            "terms_accepted_at": _now(),
+        })
         return {"data": updated.model_dump(by_alias=True)}
 
     # ── Favorites ──────────────────────────────────────────────────────────────

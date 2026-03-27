@@ -7,6 +7,9 @@ class CamelModel(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
+CURRENT_TERMS_VERSION = "1.0"
+
+
 class UserProfile(CamelModel):
     uid: str
     email: str
@@ -14,6 +17,8 @@ class UserProfile(CamelModel):
     child_age: int | None
     preferred_topics: list[str]
     is_creator: bool = False
+    terms_version: str | None = None
+    terms_accepted_at: str | None = None
     created_at: str
     updated_at: str
 
@@ -23,3 +28,8 @@ class UpdateProfileBody(CamelModel):
     child_age: int | None = Field(default=None, ge=1, le=12)
     preferred_topics: list[str] | None = None
     display_name: str | None = Field(default=None, min_length=1, max_length=100)
+
+
+class AcceptTermsBody(CamelModel):
+    """Request body for POST /v1/me/accept-terms."""
+    terms_version: str = Field(min_length=1, max_length=20)

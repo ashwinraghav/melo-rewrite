@@ -1,18 +1,54 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { useAuthContext } from '@/context/auth-context'
+import { useApiClient } from '@/hooks/useApiClient'
 import { Icon } from '@/components/icon'
+import { CURRENT_TERMS_VERSION } from '@mello/types'
 
 export default function SignInPage() {
   const { user, loading, signInWithGoogle } = useAuthContext()
   const router = useRouter()
+  const client = useApiClient()
+  const [termsAccepted, setTermsAccepted] = useState(false)
+  const [signingIn, setSigningIn] = useState(false)
+  // Track whether this sign-in session needs terms acceptance recorded
+  const pendingAcceptRef = useRef(false)
+
+  const handleSignIn = useCallback(async () => {
+    setSigningIn(true)
+    try {
+      pendingAcceptRef.current = true
+      await signInWithGoogle()
+      // Terms acceptance is recorded in the useEffect below once auth state settles,
+      // because the API client needs a valid token from the newly signed-in user.
+    } catch {
+      pendingAcceptRef.current = false
+      setSigningIn(false)
+    }
+  }, [signInWithGoogle])
 
   useEffect(() => {
-    if (!loading && user) router.replace('/')
-  }, [user, loading, router])
+    if (loading || !user) return
+
+    if (pendingAcceptRef.current) {
+      pendingAcceptRef.current = false
+      // Record terms acceptance now that we have a valid auth token
+      client
+        .post('/v1/me/accept-terms', { termsVersion: CURRENT_TERMS_VERSION })
+        .catch(() => {
+          // Non-fatal: the terms gate in the app layout will catch this
+        })
+        .finally(() => {
+          setSigningIn(false)
+          router.replace('/')
+        })
+    } else {
+      router.replace('/')
+    }
+  }, [user, loading, router, client])
 
   return (
     <main className="relative flex min-h-dvh flex-col items-center justify-center px-6">
@@ -50,42 +86,58 @@ export default function SignInPage() {
 
         {/* Auth card — glassmorphic */}
         <div className="glass-card rounded-[2rem] p-8">
+          {/* Terms checkbox */}
+          <label className="mb-5 flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={termsAccepted}
+              onChange={(e) => setTermsAccepted(e.target.checked)}
+              className="mt-0.5 h-5 w-5 shrink-0 appearance-none rounded border-2 border-outline-variant bg-transparent checked:border-primary checked:bg-primary transition-all duration-200"
+              style={{
+                backgroundImage: termsAccepted
+                  ? "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3E%3C/svg%3E\")"
+                  : 'none',
+                backgroundSize: '12px',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+              }}
+            />
+            <span className="font-body text-xs leading-relaxed text-on-surface-variant">
+              I am at least 18 years old and agree to the{' '}
+              <a
+                href="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline underline-offset-2"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Terms of Service
+              </a>{' '}
+              and{' '}
+              <a
+                href="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline underline-offset-2"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Privacy Policy
+              </a>
+            </span>
+          </label>
+
           <div className="flex flex-col gap-3">
             <button
-              onClick={signInWithGoogle}
-              className="flex w-full items-center justify-center gap-3 rounded-full bg-primary px-6 py-4 font-body text-sm font-medium text-on-primary transition-all duration-300 hover:brightness-110 active:scale-[0.98]"
+              onClick={handleSignIn}
+              disabled={!termsAccepted || signingIn}
+              className="flex w-full items-center justify-center gap-3 rounded-full bg-primary px-6 py-4 font-body text-sm font-medium text-on-primary transition-all duration-300 hover:brightness-110 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100 disabled:active:scale-100"
             >
               <GoogleIcon />
-              Continue with Google
+              {signingIn ? 'Signing in...' : 'Continue with Google'}
             </button>
 
-            <button
-              disabled
-              className="flex w-full items-center justify-center gap-3 rounded-full bg-surface-container-high px-6 py-4 font-body text-sm font-medium text-on-surface transition-all duration-300 opacity-50 cursor-not-allowed"
-            >
-              <AppleIcon />
-              Continue with Apple
-            </button>
-
-            <div className="my-2 flex items-center gap-3">
-              <div className="h-px flex-1 bg-outline-variant/30" />
-              <span className="font-body text-xs text-on-surface-variant">or</span>
-              <div className="h-px flex-1 bg-outline-variant/30" />
-            </div>
-
-            <button
-              disabled
-              className="flex w-full items-center justify-center gap-3 rounded-full bg-surface-container-high px-6 py-4 font-body text-sm font-medium text-on-surface transition-all duration-300 opacity-50 cursor-not-allowed"
-            >
-              <Icon name="mail" size={20} className="text-on-surface-variant" />
-              Sign in with email
-            </button>
           </div>
         </div>
-
-        <p className="mt-8 text-center text-xs text-on-surface-variant/50">
-          By continuing, you agree to our Terms of Service and Privacy Policy.
-        </p>
       </motion.div>
     </main>
   )
@@ -102,11 +154,3 @@ function GoogleIcon() {
   )
 }
 
-function AppleIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor" aria-hidden>
-      <path d="M14.94 9.88c-.02-2.01 1.64-2.98 1.71-3.02-.93-1.36-2.38-1.55-2.9-1.57-1.23-.13-2.4.73-3.03.73-.63 0-1.6-.71-2.63-.69-1.35.02-2.6.79-3.3 2-1.41 2.44-.36 6.06 1.01 8.04.67.97 1.47 2.06 2.52 2.02 1.01-.04 1.39-.65 2.61-.65 1.22 0 1.56.65 2.63.63 1.09-.02 1.78-.99 2.44-1.96.77-1.12 1.09-2.21 1.1-2.27-.02-.01-2.12-.81-2.14-3.23z" />
-      <path d="M12.97 3.53c.56-.68.93-1.62.83-2.56-.8.03-1.77.53-2.34 1.21-.52.6-.97 1.55-.85 2.47.89.07 1.8-.45 2.36-1.12z" />
-    </svg>
-  )
-}

@@ -250,6 +250,8 @@ class FirestoreUserRepository(UserRepository):
             child_age=data.get("childAge"),
             preferred_topics=data.get("preferredTopics", []),
             is_creator=data.get("isCreator", False),
+            terms_version=data.get("termsVersion"),
+            terms_accepted_at=data.get("termsAcceptedAt"),
             created_at=data.get("createdAt", _now()),
             updated_at=data.get("updatedAt", _now()),
         )
@@ -261,6 +263,8 @@ class FirestoreUserRepository(UserRepository):
             "childAge": profile.child_age,
             "preferredTopics": profile.preferred_topics,
             "isCreator": profile.is_creator,
+            "termsVersion": profile.terms_version,
+            "termsAcceptedAt": profile.terms_accepted_at,
             "createdAt": profile.created_at,
             "updatedAt": profile.updated_at,
         }
@@ -273,6 +277,8 @@ class FirestoreUserRepository(UserRepository):
             "child_age": "childAge",
             "preferred_topics": "preferredTopics",
             "display_name": "displayName",
+            "terms_version": "termsVersion",
+            "terms_accepted_at": "termsAcceptedAt",
         }
         firestore_data = {field_map.get(k, k): v for k, v in data.items()}
         firestore_data["updatedAt"] = _now()

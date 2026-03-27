@@ -21,20 +21,27 @@ export interface UserProfile {
   /**
    * Age of the child this account is configured for.
    * Used to filter stories by ageMin/ageMax. Range: 1–12.
-   * Null until the parent completes onboarding.
+   * Null until the parent updates their preferences.
    */
   childAge: number | null
   /**
-   * Topics the parent has selected during onboarding or preference updates.
+   * Topics the parent has selected during preference updates.
    * Stories are filtered to include at least one of these topics.
    * Empty array = no filter applied (show everything).
    */
   preferredTopics: string[]
   /** Whether this user can create and publish stories. */
   isCreator: boolean
+  /** Version of the Terms of Service the user has accepted (e.g. "1.0"). Null if not yet accepted. */
+  termsVersion: string | null
+  /** ISO 8601 timestamp of when the user accepted the current terms. Null if not yet accepted. */
+  termsAcceptedAt: string | null
   createdAt: string // ISO 8601
   updatedAt: string // ISO 8601
 }
+
+/** Current Terms of Service version. Bump this when material changes are made. */
+export const CURRENT_TERMS_VERSION = '1.0'
 
 /** Fields the parent can update after initial profile creation. */
 export type UserProfileUpdate = Pick<UserProfile, 'childAge' | 'preferredTopics' | 'displayName'>
