@@ -21,6 +21,16 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => mockSearchParams,
 }))
 
+vi.mock('@/context/auth-context', () => ({
+  useAuthContext: () => ({
+    user: { uid: 'user-1', photoURL: null, displayName: 'Test', email: 'test@test.com' },
+    loading: false,
+    signOut: vi.fn(),
+    getIdToken: vi.fn(),
+    signInWithGoogle: vi.fn(),
+  }),
+}))
+
 const mockPost = vi.fn()
 vi.mock('@/hooks/useApiClient', () => ({
   useApiClient: () => ({

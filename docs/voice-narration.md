@@ -243,8 +243,8 @@ overrideAudioUrl, overrideSegments) resets on track change.
 
 ## Testing
 
-- **103 API tests** (22 voice-specific) covering auth enforcement, invite flow, recording validation, voice limits, conversion, and listing
-- **73 web tests** covering components and pages
+- **104 API tests** (22 voice-specific) covering auth enforcement, invite flow, recording validation, voice limits, conversion, and listing
+- **87 web tests** covering components and pages
 - Mock implementations (`MockVoiceCloner`, `MockAudioPublisher`) enable testing without ElevenLabs or GCP credentials
 
 ## Future Considerations

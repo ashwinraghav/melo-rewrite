@@ -239,3 +239,54 @@ page.tsx              → server component (runs at build time)
 The static HTML served by Firebase Hosting CDN contains the full skeleton
 layout. The browser paints it immediately. JS downloads in the background,
 React hydrates, auth resolves, API call fires, data replaces the skeleton.
+
+### 12. Firestore native vector search (replacing in-memory)
+
+**Problem:** The search service loaded all story embeddings into a Python dict
+at startup, computed cosine similarity in a loop, and maintained an invalidation
+cache. This was O(N) in Python on every search and required re-loading all
+embeddings when a story was published.
+
+**Fix:** Migrated to Firestore's native `find_nearest` KNN vector search.
+Firestore handles cosine similarity server-side using a vector index.
+
+- Created a composite vector index on `(isPublished, embedding)` with 768
+  dimensions via `gcloud firestore indexes composite create`
+- Migrated existing embeddings from `list[float]` to `Vector()` type
+  (Firestore `find_nearest` requires the `Vector` type, not plain arrays)
+- Updated `create()` and `update()` to wrap embeddings in `Vector()`
+- Added `vector_search()` to `StoryRepository` interface + implementations
+- Rewrote `SearchService` to delegate to `repo.vector_search()` instead of
+  in-memory cosine similarity
+- Kept Cohere reranking as a second-pass refinement on top candidates
+- Removed the `load_embeddings()` cache and `invalidate()` pattern
+
+**Files:** `repositories/interfaces.py`, `repositories/firestore.py`,
+`repositories/memory.py`, `services/search.py`, `routes/search.py`
+**Impact:** Eliminates O(N) Python loop and memory cache. Search scales with
+Firestore infrastructure instead of Python memory. Index updates automatically
+when stories are published.
+
+### 13. Static CDN catalog for story browse + player
+
+**Problem:** The stories list and detail pages fetched from the API server,
+which required Firebase Auth → API call → Firestore query on every page load.
+This was the main blocker for player page Lighthouse scores.
+
+**Fix:** Pre-generate story catalog as static JSON files in GCS, served via
+Cloud CDN. The web client fetches from `cdn.melostories.com/catalog/` instead
+of the API.
+
+Generated files:
+- `catalog/stories.json` — full catalog (list view, no text/segments)
+- `catalog/topics/{topic}.json` — per-topic lists
+- `catalog/stories/{id}.json` — individual story detail (with text + segments)
+
+Catalog is regenerated after each story publish via `CatalogPublisherService`.
+Manual regeneration: `scripts/regenerate-catalog.py`.
+
+**Files:** `services/catalog_publisher.py`, `routes/creator.py`, `lib/cdn.ts`,
+stories + player content components
+**Impact:** Browse and play flows require zero auth, zero API calls. Data
+arrives from CDN edge in ~10-20ms. Lighthouse can now measure the player page
+without needing to authenticate.
