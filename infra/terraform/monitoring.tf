@@ -195,9 +195,9 @@ resource "google_monitoring_dashboard" "mello_api" {
             { name = "elevenlabs.duration",  title = "ElevenLabs" },
             { name = "cohere.duration",      title = "Cohere" },
           ] : {
-            xPos   = (i % 5) * 10
+            xPos   = i * 9
             yPos   = 48
-            width  = 10
+            width  = 9
             height = 12
             widget = {
               title = "${metric_info.title} Latency"
@@ -232,9 +232,9 @@ resource "google_monitoring_dashboard" "mello_api" {
             { name = "elevenlabs.errors",  title = "ElevenLabs Errors" },
             { name = "cohere.errors",      title = "Cohere Errors" },
           ] : {
-            xPos   = (i % 5) * 10
+            xPos   = i * 9
             yPos   = 60
-            width  = 10
+            width  = 9
             height = 12
             widget = {
               title = metric_info.title

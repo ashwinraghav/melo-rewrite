@@ -22,6 +22,12 @@ def create_app(
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        # Enable asyncio debug mode after startup completes.
+        # This avoids false positives during OTel/Firestore initialization.
+        import asyncio
+        loop = asyncio.get_running_loop()
+        loop.set_debug(True)
+        loop.slow_callback_duration = 0.1  # 100ms
         yield
         # Close async clients on shutdown
         if services:
