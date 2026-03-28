@@ -1,8 +1,13 @@
 import type { Metadata, Viewport } from 'next'
+import Script from 'next/script'
 import { Plus_Jakarta_Sans, Lexend } from 'next/font/google'
 import '@/styles/globals.css'
+import { Suspense } from 'react'
 import { AuthProvider } from '@/context/auth-context'
 import { QueryProvider } from '@/context/query-provider'
+import { AnalyticsPageView } from '@/components/analytics-page-view'
+
+const GA_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -50,6 +55,26 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
+        {GA_ID && (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
+              strategy="afterInteractive"
+            />
+            <Script id="ga-init" strategy="afterInteractive">
+              {`
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', '${GA_ID}', { send_page_view: false });
+                window.gtag = gtag;
+              `}
+            </Script>
+          </>
+        )}
+        <Suspense fallback={null}>
+          <AnalyticsPageView />
+        </Suspense>
         <QueryProvider>
           <AuthProvider>{children}</AuthProvider>
         </QueryProvider>

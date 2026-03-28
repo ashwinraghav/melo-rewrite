@@ -13,6 +13,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Icon } from '@/components/icon'
 import { VoiceRecorder } from '@/components/voice-recorder'
+import { trackVoiceRecordingSubmit } from '@/lib/analytics'
 import type { InviteInfo, ApiResponse } from '@mello/types'
 
 type PageState = 'loading' | 'ready' | 'uploading' | 'success' | 'error' | 'missing-token'
@@ -52,6 +53,7 @@ export function RecordContent() {
   const handleRecordingComplete = useCallback(
     async (blob: Blob) => {
       if (!token) return
+      trackVoiceRecordingSubmit()
       setState('uploading')
       try {
         const formData = new FormData()

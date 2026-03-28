@@ -6,9 +6,11 @@ import { usePathname } from 'next/navigation'
 import { useAuthContext } from '@/context/auth-context'
 import { cn } from '@/lib/cn'
 import { Icon } from './icon'
+import { trackSignOut } from '@/lib/analytics'
 
 const TABS = [
   { href: '/discover', label: 'Home', icon: 'auto_stories' },
+  { href: '/search', label: 'Search', icon: 'search' },
   { href: '/create', label: 'Create', icon: 'edit_note' },
 ]
 
@@ -31,7 +33,6 @@ export function BottomNav() {
   const displayName = user?.displayName ?? user?.email ?? 'Account'
   const initials = displayName.charAt(0).toUpperCase()
 
-  // Check if we're on a "profile" page (one of the menu items)
   const isProfileActive =
     MENU_ITEMS.some((item) => pathname.startsWith(item.href)) || menuOpen
 
@@ -125,6 +126,7 @@ function ProfileTab({
   }, [pathname, setMenuOpen])
 
   const handleSignOut = useCallback(() => {
+    trackSignOut()
     setMenuOpen(false)
     onSignOut()
   }, [onSignOut, setMenuOpen])
@@ -169,7 +171,6 @@ function ProfileTab({
           role="menu"
           className="absolute bottom-full right-0 z-50 mb-2 min-w-[200px] overflow-hidden rounded-2xl bg-surface-container-high/95 shadow-lg backdrop-blur-[12px]"
         >
-          {/* User info */}
           <div className="px-4 py-3">
             <p className="truncate font-display text-sm font-medium text-on-surface">
               {displayName}
@@ -183,7 +184,6 @@ function ProfileTab({
 
           <div className="h-px bg-outline-variant/15" />
 
-          {/* Navigation items */}
           {MENU_ITEMS.map((item) => {
             const itemActive = pathname.startsWith(item.href)
             return (
@@ -204,7 +204,6 @@ function ProfileTab({
 
           <div className="h-px bg-outline-variant/15" />
 
-          {/* Sign out */}
           <button
             onClick={handleSignOut}
             role="menuitem"

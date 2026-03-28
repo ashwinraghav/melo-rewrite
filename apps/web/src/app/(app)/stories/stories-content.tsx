@@ -11,6 +11,7 @@ import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { fetchStoryList } from '@/lib/cdn'
 import { Icon } from '@/components/icon'
+import { trackPlayAll, trackStorySelected } from '@/lib/analytics'
 import type { PaginatedResponse, StoryWithAudioUrl } from '@mello/types'
 
 const TOPIC_META: Record<string, { label: string; subtitle: string; icon: string; accent: string }> = {
@@ -113,7 +114,7 @@ export function StoriesContent() {
           {/* Play all button */}
           {stories.length > 0 && (
             <button
-              onClick={() => playStory(stories[0]!.id)}
+              onClick={() => { trackPlayAll(topics || null, stories.length); playStory(stories[0]!.id) }}
               className="mt-4 flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 font-body text-sm font-medium text-on-primary transition-all duration-300 hover:brightness-110 active:scale-[0.98]"
             >
               <Icon name="play_arrow" size={18} filled />
@@ -150,7 +151,7 @@ export function StoriesContent() {
           <motion.button
             key={story.id}
             variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}
-            onClick={() => playStory(story.id)}
+            onClick={() => { trackStorySelected(story.id, story.title, 'playlist'); playStory(story.id) }}
             className="flex w-full items-center gap-4 rounded-[1rem] p-3 text-left transition-all duration-300 hover:bg-surface-container-high/30 active:scale-[0.98]"
           >
             {/* Cover art thumbnail */}

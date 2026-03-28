@@ -1,38 +1,51 @@
 'use client'
 
 /**
- * Semantic search page — find stories by describing a situation or need.
+ * Semantic search page — describe a situation to find matching stories.
  *
- * The search query is stored in the URL (/search?q=...) so that
- * navigating back from the player restores the query + cached results.
- * Uses useQuery (not useMutation) so TanStack Query caches results by key.
+ * Unlike keyword search, parents describe higher-order problems like
+ * "my child is afraid of the dark" or "dealing with a new sibling."
+ * The UI communicates this with conversational framing, suggestion chips,
+ * and a multi-line input area.
+ *
+ * Query is stored in the URL (/search?q=...) so back-navigation from
+ * the player restores results. TanStack Query caches by key.
  */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useApiClient } from '@/hooks/useApiClient'
 import { useAuthContext } from '@/context/auth-context'
 import { Icon } from '@/components/icon'
+import { trackSearch, trackSearchSuggestion, trackStorySelected } from '@/lib/analytics'
 import type { SearchResult, PaginatedResponse } from '@mello/types'
+
+const SUGGESTIONS = [
+  { label: 'afraid of the dark', icon: 'dark_mode' },
+  { label: 'new sibling jealousy', icon: 'family_restroom' },
+  { label: 'first day of school', icon: 'school' },
+  { label: "won't share toys", icon: 'toys' },
+  { label: 'bedtime anxiety', icon: 'bedtime' },
+  { label: 'making new friends', icon: 'group_add' },
+] as const
 
 export function SearchContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const client = useApiClient()
   const { user } = useAuthContext()
+  const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  // The submitted query lives in the URL; the input is local state
   const activeQuery = searchParams.get('q') ?? ''
   const [input, setInput] = useState(activeQuery)
 
-  // useQuery keyed by the URL query — cached results survive back-navigation
   const { data: searchResponse, isFetching } = useQuery({
     queryKey: ['search', activeQuery],
     queryFn: () => client.post<SearchResult[]>('/v1/search', { query: activeQuery, limit: 10 }),
     enabled: !!activeQuery && !!user,
-    staleTime: 5 * 60 * 1000, // cache search results for 5 minutes
+    staleTime: 5 * 60 * 1000,
     retry: false,
   })
 
@@ -40,29 +53,44 @@ export function SearchContent() {
     ? (searchResponse as PaginatedResponse<SearchResult> | undefined)?.data ?? null
     : null
 
+  // Track search event when results arrive
+  const lastTrackedQuery = useRef('')
+  if (results !== null && activeQuery && activeQuery !== lastTrackedQuery.current) {
+    lastTrackedQuery.current = activeQuery
+    trackSearch(activeQuery, results.length)
+  }
+
   const handleSearch = useCallback(() => {
     const q = input.trim()
     if (!q) return
+    // Track after results come back via the query effect below
     router.replace(`/search?q=${encodeURIComponent(q)}`)
   }, [input, router])
+
+  const handleSuggestion = useCallback(
+    (label: string) => {
+      trackSearchSuggestion(label)
+      setInput(label)
+      router.replace(`/search?q=${encodeURIComponent(label)}`)
+    },
+    [router],
+  )
 
   const handleClear = useCallback(() => {
     setInput('')
     router.replace('/search')
+    inputRef.current?.focus()
   }, [router])
 
   return (
     <div className="px-6 py-8 pb-28">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
-        <div className="mb-1 flex items-center gap-3">
-          <Icon name="search" size={28} className="text-primary" />
-          <h1 className="font-display text-2xl font-bold tracking-tight text-on-surface">
-            Find a Story
-          </h1>
-        </div>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-on-surface">
+          What&apos;s your child going through?
+        </h1>
         <p className="mt-2 font-body text-sm text-on-surface-variant">
-          Describe what you&apos;re looking for — a topic, a lesson, or a situation your child is going through.
+          Describe a situation, feeling, or topic — we&apos;ll find stories that help.
         </p>
       </motion.div>
 
@@ -71,9 +99,10 @@ export function SearchContent() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="glass-card mb-6 rounded-[1.5rem] p-5"
+        className="glass-card relative mb-5 rounded-[1.5rem] p-4"
       >
         <textarea
+          ref={inputRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
@@ -82,34 +111,81 @@ export function SearchContent() {
               handleSearch()
             }
           }}
-          placeholder="e.g. &quot;my child is jealous of the new baby&quot; or &quot;stories about making friends at school&quot;"
-          className="w-full resize-none bg-transparent font-body text-sm leading-relaxed text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none"
-          rows={3}
+          placeholder={`e.g. "my child is jealous of the new baby"`}
+          className="w-full resize-none bg-transparent pr-12 font-body text-sm leading-relaxed text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none"
+          rows={2}
         />
-        <div className="mt-3 flex items-center gap-2">
-          <button
-            onClick={handleSearch}
-            disabled={!input.trim() || isFetching}
-            className="flex items-center gap-2 rounded-full bg-gradient-to-r from-primary to-primary-dim px-5 py-2.5 font-body text-sm font-medium text-on-primary transition-all duration-300 hover:brightness-110 active:scale-[0.98] disabled:opacity-40"
-          >
-            {isFetching ? (
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-on-primary border-t-transparent" />
-            ) : (
-              <Icon name="search" size={16} />
-            )}
-            {isFetching ? 'Searching...' : 'Search'}
-          </button>
-          {activeQuery && (
-            <button
-              onClick={handleClear}
-              className="flex items-center gap-1.5 rounded-full bg-surface-container-high/40 px-4 py-2.5 font-body text-xs text-on-surface-variant transition-all hover:bg-surface-container-highest/60"
+        {/* Send button inside the card */}
+        <AnimatePresence>
+          {input.trim() && (
+            <motion.button
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              onClick={isFetching ? undefined : handleSearch}
+              disabled={isFetching}
+              className="absolute bottom-4 right-4 flex h-9 w-9 items-center justify-center rounded-full bg-primary text-on-primary transition-all hover:brightness-110 active:scale-95 disabled:opacity-50"
+              aria-label="Search"
             >
-              <Icon name="close" size={14} />
-              Clear
-            </button>
+              {isFetching ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-on-primary border-t-transparent" />
+              ) : (
+                <Icon name="arrow_upward" size={20} />
+              )}
+            </motion.button>
           )}
-        </div>
+        </AnimatePresence>
       </motion.div>
+
+      {/* Suggestion chips — shown before first search */}
+      {!activeQuery && !isFetching && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="mb-8"
+        >
+          <p className="mb-3 font-body text-xs font-medium uppercase tracking-wider text-on-surface-variant/50">
+            Try something like
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {SUGGESTIONS.map((s, i) => (
+              <motion.button
+                key={s.label}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25 + i * 0.04 }}
+                onClick={() => handleSuggestion(s.label)}
+                className="flex items-center gap-2 rounded-full bg-surface-container-high/50 px-4 py-2.5 font-body text-sm text-on-surface-variant transition-all duration-200 hover:bg-surface-container-highest/50 hover:text-on-surface active:scale-[0.97]"
+              >
+                <Icon name={s.icon} size={16} className="text-primary/70" />
+                {s.label}
+              </motion.button>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Active query pill + clear */}
+      {activeQuery && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="mb-5 flex items-center gap-2"
+        >
+          <span className="font-body text-xs text-on-surface-variant">
+            Showing results for
+          </span>
+          <button
+            onClick={handleClear}
+            className="flex items-center gap-1.5 rounded-full bg-surface-container-high/50 px-3 py-1.5 font-body text-xs text-on-surface transition-all hover:bg-surface-container-highest/60"
+          >
+            &ldquo;{activeQuery}&rdquo;
+            <Icon name="close" size={14} className="text-on-surface-variant" />
+          </button>
+        </motion.div>
+      )}
 
       {/* Results */}
       <AnimatePresence mode="wait">
@@ -120,29 +196,29 @@ export function SearchContent() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
           >
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-display text-lg font-semibold text-on-surface">
-                {results.length > 0 ? `${results.length} Stories Found` : 'No Stories Found'}
-              </h2>
-              {results.length > 0 && (
+            {results.length > 0 && (
+              <div className="mb-3 flex items-center justify-between">
+                <span className="font-body text-xs text-on-surface-variant">
+                  {results.length} stories
+                </span>
                 <button
                   onClick={() => {
                     const first = results[0]
                     if (first) router.push(`/player?id=${first.id}`)
                   }}
-                  className="flex items-center gap-1.5 rounded-full bg-primary/15 px-4 py-2 font-body text-xs font-medium text-primary transition-all hover:bg-primary/25"
+                  className="flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1.5 font-body text-xs font-medium text-primary transition-all hover:bg-primary/25"
                 >
-                  <Icon name="play_circle" size={16} filled />
+                  <Icon name="play_circle" size={14} filled />
                   Play All
                 </button>
-              )}
-            </div>
+              </div>
+            )}
 
             {results.length === 0 && (
               <div className="flex flex-col items-center gap-3 py-12">
                 <Icon name="search_off" size={48} className="text-on-surface-variant/30" />
                 <p className="font-body text-sm text-on-surface-variant">
-                  No stories matched your search. Try different words.
+                  No stories matched. Try describing it differently.
                 </p>
               </div>
             )}
@@ -154,7 +230,7 @@ export function SearchContent() {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.04 }}
-                  onClick={() => router.push(`/player?id=${story.id}`)}
+                  onClick={() => { trackStorySelected(story.id, story.title, 'search'); router.push(`/player?id=${story.id}`) }}
                   className="glass-card flex items-center gap-4 rounded-[1rem] p-4 text-left transition-all duration-300 hover:bg-surface-container-high/40 active:scale-[0.98]"
                 >
                   <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl bg-surface-container-high">
@@ -174,7 +250,7 @@ export function SearchContent() {
                       </p>
                       {story.source === 'user' && (
                         <span className="flex-shrink-0 rounded-full bg-tertiary/15 px-2 py-0.5 font-body text-[10px] font-medium text-tertiary">
-                          Shar
+                          Yours
                         </span>
                       )}
                     </div>
@@ -192,22 +268,6 @@ export function SearchContent() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Empty state — shown before first search */}
-      {!activeQuery && !isFetching && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="flex flex-col items-center gap-3 py-12"
-        >
-          <Icon name="psychology" size={48} className="text-on-surface-variant/20" />
-          <p className="text-center font-body text-sm leading-relaxed text-on-surface-variant/60">
-            Try describing a situation, like<br />
-            &ldquo;my child is afraid of the dark&rdquo;
-          </p>
-        </motion.div>
-      )}
     </div>
   )
 }

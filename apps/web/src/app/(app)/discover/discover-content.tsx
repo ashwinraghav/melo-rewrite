@@ -11,6 +11,7 @@
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Icon } from '@/components/icon'
+import { trackTopicSelected, trackSpinGalaxy } from '@/lib/analytics'
 
 const TOPICS = [
   { id: 'park', label: 'Going to the Park', subtitle: 'Exploring nature and playing in the sunshine together.', icon: 'park' },
@@ -58,7 +59,7 @@ export function DiscoverContent() {
               hidden: { opacity: 0, y: 16 },
               show: { opacity: 1, y: 0 },
             }}
-            onClick={() => router.push(`/stories?topics=${topic.id}`)}
+            onClick={() => { trackTopicSelected(topic.id); router.push(`/stories?topics=${topic.id}`) }}
             className="glass-card flex flex-col items-start gap-3 rounded-[1rem] p-5 text-left transition-all duration-300 hover:bg-surface-container-high/40 active:scale-[0.97]"
             style={i % 2 === 1 ? { transform: 'translateY(1.5rem)' } : {}}
           >
@@ -95,7 +96,7 @@ export function DiscoverContent() {
           Let the stars decide! We&apos;ll pick a gentle story for you based on tonight&apos;s moon.
         </p>
         <button
-          onClick={() => router.push('/stories')}
+          onClick={() => { trackSpinGalaxy(); router.push('/stories') }}
           className="flex items-center gap-2 rounded-full bg-primary px-6 py-3 font-body text-sm font-medium text-on-primary transition-all duration-300 hover:brightness-110 active:scale-[0.98]"
         >
           <Icon name="casino" size={18} />

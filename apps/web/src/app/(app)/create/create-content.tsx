@@ -15,6 +15,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useApiClient } from '@/hooks/useApiClient'
 import { Icon } from '@/components/icon'
+import { trackGenerateStart, trackGenerateComplete, trackPublishStart, trackPublishComplete } from '@/lib/analytics'
 import type { ApiResponse, GeneratedStoryDraft, StoryWithAudioUrl, PublishStatus, GenerateStatus } from '@mello/types'
 
 type FlowState = 'prompt' | 'generating' | 'review' | 'publishing' | 'success'
@@ -119,6 +120,7 @@ export function CreateContent() {
       setEditText(d.storyText)
       setEditTopics(d.topics.join(', '))
       setError(null)
+      trackGenerateComplete(d.id)
       setState('review')
     } else if (status.generateStatus === 'failed') {
       setError(status.generateError || 'Failed to generate story. Please try again.')
@@ -137,8 +139,10 @@ export function CreateContent() {
 
     if (status.publishStatus === 'ready' && status.isPublished && draft) {
       client.get<StoryWithAudioUrl>(`/v1/stories/${draft.id}`).then((resp) => {
-        setPublishedStory((resp as ApiResponse<StoryWithAudioUrl>).data)
+        const published = (resp as ApiResponse<StoryWithAudioUrl>).data
+        setPublishedStory(published)
         setActiveStoryId(null)
+        trackPublishComplete(draft.id, published.title)
         setState('success')
       })
     } else if (status.publishStatus === 'failed') {
@@ -158,6 +162,7 @@ export function CreateContent() {
     if (!prompt.trim()) return
     setError(null)
     setState('generating')
+    trackGenerateStart(prompt.length)
     generateMutation.mutate(prompt)
   }, [prompt, generateMutation])
 
@@ -185,6 +190,7 @@ export function CreateContent() {
       }
     }
 
+    trackPublishStart(draft.id)
     publishMutation.mutate(draft.id)
   }, [draft, editTitle, editDescription, editText, editTopics, saveMutation, publishMutation])
 

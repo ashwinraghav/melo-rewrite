@@ -11,6 +11,7 @@ import { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useApiClient } from '@/hooks/useApiClient'
 import { Icon } from '@/components/icon'
+import { trackVoiceInviteCreated, trackVoiceInviteCopied, trackVoiceDeleted } from '@/lib/analytics'
 import type {
   Voice,
   CreateInviteBody,
@@ -61,12 +62,14 @@ export function VoicesContent() {
 
   const handleCreateInvite = useCallback(() => {
     if (!voiceName.trim() || !relationship.trim()) return
+    trackVoiceInviteCreated(voiceName.trim(), relationship.trim())
     createInvite({ voiceName: voiceName.trim(), relationship: relationship.trim() })
   }, [voiceName, relationship, createInvite])
 
   const handleCopy = useCallback(() => {
     if (inviteUrl) {
       navigator.clipboard.writeText(inviteUrl)
+      trackVoiceInviteCopied()
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }
@@ -74,6 +77,7 @@ export function VoicesContent() {
 
   const handleDelete = useCallback((voiceId: string, name: string) => {
     if (confirm(`Delete "${name}"? Stories converted with this voice will no longer play.`)) {
+      trackVoiceDeleted(voiceId)
       deleteVoice(voiceId)
     }
   }, [deleteVoice])

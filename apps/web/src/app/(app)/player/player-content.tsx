@@ -19,6 +19,10 @@ import { ReadAlong } from '@/components/read-along'
 import { PersonalizeSheet } from '@/components/personalize-sheet'
 import { Icon } from '@/components/icon'
 import { cn } from '@/lib/cn'
+import {
+  trackStoryPlay, trackStoryPause, trackStoryComplete, trackStoryProgress,
+  trackSkipTrack, trackPersonalizeOpened, trackVoiceSelected,
+} from '@/lib/analytics'
 import type { StoryWithAudioUrl, PaginatedResponse, StorySegment } from '@mello/types'
 import { COMPLETION_THRESHOLD } from '@mello/types'
 
@@ -52,10 +56,11 @@ export function PlayerContent() {
 
   const handleVoiceChange = useCallback(
     (voiceId: string | null, voiceName: string | null, audioUrl: string, segments: StorySegment[]) => {
+      if (voiceId) trackVoiceSelected(currentId, voiceId, voiceName!)
       setVoiceOverride(voiceId ? { voiceId, voiceName: voiceName!, audioUrl, segments } : null)
       setShowPersonalize(false)
     },
-    [],
+    [currentId],
   )
 
   // Fetch from static CDN catalog — no auth needed, no API server hit
@@ -117,6 +122,8 @@ export function PlayerContent() {
   const handleProgress = useCallback(
     (progressSeconds: number) => {
       if (!story) return
+      const pct = story.durationSeconds > 0 ? (progressSeconds / story.durationSeconds) * 100 : 0
+      trackStoryProgress(currentId, pct, progressSeconds)
       const completed = progressSeconds >= story.durationSeconds * COMPLETION_THRESHOLD
       recordProgress({ storyId: currentId, progressSeconds, completed })
     },
@@ -132,10 +139,11 @@ export function PlayerContent() {
   }, [])
 
   const handleEnded = useCallback(() => {
+    if (story) trackStoryComplete(currentId, story.title, story.durationSeconds)
     if (nextStory) {
       switchTrack(nextStory.id)
     }
-  }, [nextStory, switchTrack])
+  }, [story, currentId, nextStory, switchTrack])
 
   // Show a skeleton-shaped loading state instead of a spinner.
   // A centered spinner wipes out the Suspense skeleton and tanks LCP.
@@ -268,7 +276,7 @@ export function PlayerContent() {
 
           {/* Personalize button */}
           <button
-            onClick={() => setShowPersonalize(true)}
+            onClick={() => { trackPersonalizeOpened(currentId); setShowPersonalize(true) }}
             className="mt-3 flex items-center gap-1.5 rounded-full bg-surface-container-high/60 px-3 py-1.5 font-body text-xs text-on-surface-variant transition-all hover:bg-surface-container-highest/60"
           >
             <Icon name="record_voice_over" size={14} />
@@ -303,7 +311,7 @@ export function PlayerContent() {
       {(prevStory || nextStory) && (
         <div className="flex items-center justify-between px-6 pb-2">
           <button
-            onClick={() => prevStory && switchTrack(prevStory.id)}
+            onClick={() => { if (prevStory) { trackSkipTrack('prev', prevStory.id); switchTrack(prevStory.id) } }}
             disabled={!prevStory}
             className="flex items-center gap-1.5 rounded-full px-3 py-1.5 font-body text-xs text-on-surface-variant transition-all hover:text-on-surface disabled:opacity-30"
             aria-label="Previous story"
@@ -312,7 +320,7 @@ export function PlayerContent() {
             <span className="max-w-[8rem] truncate">{prevStory?.title ?? ''}</span>
           </button>
           <button
-            onClick={() => nextStory && switchTrack(nextStory.id)}
+            onClick={() => { if (nextStory) { trackSkipTrack('next', nextStory.id); switchTrack(nextStory.id) } }}
             disabled={!nextStory}
             className="flex items-center gap-1.5 rounded-full px-3 py-1.5 font-body text-xs text-on-surface-variant transition-all hover:text-on-surface disabled:opacity-30"
             aria-label="Next story"
@@ -331,7 +339,16 @@ export function PlayerContent() {
           autoPlay
           onProgress={handleProgress}
           onTimeUpdate={setCurrentTime}
-          onPlayingChange={setIsPlaying}
+          onPlayingChange={(playing) => {
+            setIsPlaying(playing)
+            if (story) {
+              if (playing) trackStoryPlay(currentId, story.title)
+              else {
+                const pct = story.durationSeconds > 0 ? (currentTime / story.durationSeconds) * 100 : 0
+                trackStoryPause(currentId, pct)
+              }
+            }
+          }}
           onEnded={handleEnded}
         />
       </div>

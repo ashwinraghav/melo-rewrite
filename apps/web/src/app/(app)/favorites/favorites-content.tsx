@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { useApiClient } from '@/hooks/useApiClient'
 import { Icon } from '@/components/icon'
+import { trackFavoriteRemove, trackStorySelected } from '@/lib/analytics'
 import type { Favorite, PaginatedResponse } from '@mello/types'
 
 const TOPIC_ICONS: Record<string, string> = {
@@ -109,6 +110,7 @@ export function FavoritesContent() {
               <button
                 onClick={(e) => {
                   e.stopPropagation()
+                  trackFavoriteRemove(fav.storyId)
                   removeFavorite(fav.storyId)
                 }}
                 className="text-error"
@@ -117,7 +119,7 @@ export function FavoritesContent() {
                 <Icon name="favorite" size={22} filled />
               </button>
               <button
-                onClick={() => router.push(`/player?id=${fav.storyId}`)}
+                onClick={() => { trackStorySelected(fav.storyId, '', 'favorites'); router.push(`/player?id=${fav.storyId}`) }}
                 className="flex items-center gap-1 rounded-full bg-primary px-4 py-2 font-body text-xs font-medium text-on-primary"
               >
                 <Icon name="play_circle" size={16} />

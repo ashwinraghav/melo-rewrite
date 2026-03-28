@@ -7,6 +7,7 @@ import { useAuthContext } from '@/context/auth-context'
 import { useApiClient } from '@/hooks/useApiClient'
 import { Icon } from '@/components/icon'
 import { CURRENT_TERMS_VERSION } from '@mello/types'
+import { trackSignInStart, trackSignInComplete, trackTermsAccepted } from '@/lib/analytics'
 
 export default function SignInPage() {
   const { user, loading, signInWithGoogle } = useAuthContext()
@@ -19,6 +20,7 @@ export default function SignInPage() {
 
   const handleSignIn = useCallback(async () => {
     setSigningIn(true)
+    trackSignInStart('google')
     try {
       pendingAcceptRef.current = true
       await signInWithGoogle()
@@ -36,6 +38,8 @@ export default function SignInPage() {
     if (pendingAcceptRef.current) {
       pendingAcceptRef.current = false
       // Record terms acceptance now that we have a valid auth token
+      trackSignInComplete('google')
+      trackTermsAccepted(CURRENT_TERMS_VERSION)
       client
         .post('/v1/me/accept-terms', { termsVersion: CURRENT_TERMS_VERSION })
         .catch(() => {
@@ -72,12 +76,7 @@ export default function SignInPage() {
           <img src="/logo.png" alt="Mello" className="h-20 w-auto opacity-90" />
         </div>
 
-        {/* Headline */}
-        <div className="mb-10 text-center">
-          <p className="font-body text-sm text-on-surface-variant">
-            Quiet stories for peaceful nights
-          </p>
-        </div>
+        <div className="mb-10" />
 
         {/* Auth card — glassmorphic */}
         <div className="glass-card rounded-[2rem] p-8">
