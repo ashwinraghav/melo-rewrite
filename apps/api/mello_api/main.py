@@ -23,12 +23,18 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         yield
-        # Close httpx async clients on shutdown
+        # Close async clients on shutdown
         if services:
-            for svc in [services.audio_publisher, services.voice_cloner]:
+            for svc in [services.audio_publisher, services.voice_cloner,
+                        services.cover_generator, services.catalog_publisher]:
+                # httpx.AsyncClient
                 client = getattr(svc, '_client', None)
                 if client and hasattr(client, 'aclose'):
                     await client.aclose()
+                # gcloud-aio-storage Storage
+                storage = getattr(svc, '_storage', None)
+                if storage and hasattr(storage, 'close'):
+                    await storage.close()
 
     app = FastAPI(
         title="Mello API", version="0.0.1",

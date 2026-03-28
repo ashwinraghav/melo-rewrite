@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 
 from google import genai
 from google.genai import types
-from google.cloud import storage as gcs
+from gcloud.aio.storage import Storage
 from PIL import Image
 
 log = logging.getLogger(__name__)
@@ -72,7 +72,7 @@ class VertexCoverGenerator(CoverGeneratorService):
             vertexai=True, project=gcp_project_id, location=gcp_location
         )
         self._bucket_name = bucket_name
-        self._gcs_client = gcs.Client(project=gcp_project_id)
+        self._storage = Storage()
 
     async def generate_and_upload(
         self, story_id: str, title: str, description: str, topics: list[str]
@@ -112,9 +112,10 @@ class VertexCoverGenerator(CoverGeneratorService):
         image.save(buf, "WEBP", quality=85)
         buf.seek(0)
 
-        bucket = self._gcs_client.bucket(self._bucket_name)
-        blob = bucket.blob(gcs_path)
-        await asyncio.to_thread(blob.upload_from_file, buf, "image/webp")
+        await self._storage.upload(
+            self._bucket_name, gcs_path, buf.read(),
+            content_type="image/webp",
+        )
 
         return gcs_path
 

@@ -6,14 +6,13 @@ ABC interface + production (ElevenLabs) and test (mock) implementations.
 """
 from __future__ import annotations
 
-import asyncio
 import base64
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 import httpx
-from google.cloud import storage as gcs
+from gcloud.aio.storage import Storage
 
 
 @dataclass
@@ -49,11 +48,11 @@ class ElevenLabsPublisher(AudioPublisherService):
         self._voice_id = voice_id
         self._model_id = model_id
         self._bucket_name = bucket_name
-        self._gcs_client = gcs.Client(project=gcp_project_id)
         self._client = httpx.AsyncClient(
             headers={"xi-api-key": api_key},
             timeout=120,
         )
+        self._storage = Storage()
 
     async def _generate_with_timestamps(self, text: str, voice_id: str | None = None) -> dict:
         vid = voice_id or self._voice_id
@@ -120,14 +119,10 @@ class ElevenLabsPublisher(AudioPublisherService):
     ) -> str:
         gcs_path = path_override or f"stories/{story_id}/audio.mp3"
         bucket_name = bucket_override or self._bucket_name
-        if bucket_override:
-            # Firebase Storage bucket — use firebase_admin
-            import firebase_admin.storage as fb_storage
-            bucket = fb_storage.bucket(bucket_name)
-        else:
-            bucket = self._gcs_client.bucket(bucket_name)
-        blob = bucket.blob(gcs_path)
-        await asyncio.to_thread(blob.upload_from_string, audio_bytes, "audio/mpeg")
+        await self._storage.upload(
+            bucket_name, gcs_path, audio_bytes,
+            content_type="audio/mpeg",
+        )
         return gcs_path
 
     async def publish(

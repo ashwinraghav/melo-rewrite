@@ -18,13 +18,15 @@ import json
 import logging
 from abc import ABC, abstractmethod
 
-from google.cloud import storage as gcs
+from gcloud.aio.storage import Storage
 
 from ..models.story import Story, StoryFilters, StorySegment
 
 log = logging.getLogger(__name__)
 
 CDN_HOST = "cdn.melostories.com"
+
+CACHE_CONTROL = "public, max-age=60, stale-while-revalidate=300"
 
 
 def _story_to_list_item(story: Story, bucket_name: str) -> dict:
@@ -68,19 +70,15 @@ class CatalogPublisherService(ABC):
 class GcsCatalogPublisher(CatalogPublisherService):
     def __init__(self, bucket_name: str, gcp_project_id: str) -> None:
         self._bucket_name = bucket_name
-        self._gcs_client = gcs.Client(project=gcp_project_id)
+        self._storage = Storage()
 
     async def _upload_json(self, path: str, data: dict | list) -> None:
-        bucket = self._gcs_client.bucket(self._bucket_name)
-        blob = bucket.blob(path)
-        content = json.dumps(data, separators=(",", ":"))
-
-        def _do_upload():
-            blob.upload_from_string(content, content_type="application/json")
-            blob.cache_control = "public, max-age=60, stale-while-revalidate=300"
-            blob.patch()
-
-        await asyncio.to_thread(_do_upload)
+        content = json.dumps(data, separators=(",", ":")).encode()
+        await self._storage.upload(
+            self._bucket_name, path, content,
+            content_type="application/json",
+            metadata={"cacheControl": CACHE_CONTROL},
+        )
 
     async def publish_catalog(self, stories: list[Story]) -> int:
         published = [s for s in stories if s.is_published]

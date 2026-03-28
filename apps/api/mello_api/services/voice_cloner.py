@@ -5,12 +5,11 @@ ABC interface + production (ElevenLabs) and test (mock) implementations.
 """
 from __future__ import annotations
 
-import asyncio
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import httpx
-import firebase_admin.storage as fb_storage
+from gcloud.aio.storage import Storage
 
 
 @dataclass
@@ -44,6 +43,7 @@ class ElevenLabsVoiceCloner(VoiceClonerService):
             headers={"xi-api-key": api_key},
             timeout=60,
         )
+        self._storage = Storage()
 
     async def clone_voice(self, name: str, audio_bytes: bytes) -> CloneResult:
         resp = await self._client.post(
@@ -65,28 +65,25 @@ class ElevenLabsVoiceCloner(VoiceClonerService):
 
     async def upload_sample(self, uid: str, voice_id: str, audio_bytes: bytes) -> str:
         path = f"voices/{uid}/{voice_id}/sample.webm"
-        bucket = fb_storage.bucket(self._firebase_bucket)
-        blob = bucket.blob(path)
-        await asyncio.to_thread(blob.upload_from_string, audio_bytes, "audio/webm")
+        await self._storage.upload(
+            self._firebase_bucket, path, audio_bytes,
+            content_type="audio/webm",
+        )
         return path
 
     async def upload_conversion(self, uid: str, voice_id: str, story_id: str, audio_bytes: bytes) -> str:
         path = f"voices/{uid}/{voice_id}/conversions/{story_id}.mp3"
-        bucket = fb_storage.bucket(self._firebase_bucket)
-        blob = bucket.blob(path)
-        await asyncio.to_thread(blob.upload_from_string, audio_bytes, "audio/mpeg")
+        await self._storage.upload(
+            self._firebase_bucket, path, audio_bytes,
+            content_type="audio/mpeg",
+        )
         return path
 
     async def download_sample(self, path: str) -> bytes:
-        bucket = fb_storage.bucket(self._firebase_bucket)
-        blob = bucket.blob(path)
-        return await asyncio.to_thread(blob.download_as_bytes)
+        return await self._storage.download(self._firebase_bucket, path)
 
     async def get_download_url(self, path: str) -> str:
-        bucket = fb_storage.bucket(self._firebase_bucket)
-        blob = bucket.blob(path)
-        await asyncio.to_thread(blob.make_public)
-        return blob.public_url
+        return f"https://storage.googleapis.com/{self._firebase_bucket}/{path}"
 
 
 class MockVoiceCloner(VoiceClonerService):
