@@ -1,7 +1,6 @@
 """
 Cover art generation service — Vertex AI Imagen 3.0 + GCS upload.
 
-Extracted from scripts/generate-covers.py.
 ABC interface + production (Vertex AI) and test (mock) implementations.
 """
 from __future__ import annotations
@@ -9,14 +8,22 @@ from __future__ import annotations
 import asyncio
 import io
 import logging
+import time
 from abc import ABC, abstractmethod
 
 from google import genai
 from google.genai import types
 from gcloud.aio.storage import Storage
+from opentelemetry import trace
 from PIL import Image
 
+from ..metrics import (
+    gcs_operation_duration, gcs_errors,
+    genai_request_duration, genai_errors,
+)
+
 log = logging.getLogger(__name__)
+tracer = trace.get_tracer(__name__)
 
 MAX_RETRIES = 3
 
@@ -83,27 +90,42 @@ class VertexCoverGenerator(CoverGeneratorService):
         # Retry — Imagen's safety filter can spuriously reject prompts
         image_data = None
         for attempt in range(MAX_RETRIES):
-            try:
-                response = await self._client.aio.models.generate_images(
-                    model=MODEL,
-                    prompt=prompt,
-                    config=types.GenerateImagesConfig(
-                        number_of_images=1,
-                        aspect_ratio="1:1",
-                    ),
-                )
-                if response.generated_images:
-                    image_data = response.generated_images[0].image.image_bytes
-                    break
-                log.warning("Imagen returned no images (attempt %d/%d)", attempt + 1, MAX_RETRIES)
-            except Exception as e:
-                log.warning("Imagen error (attempt %d/%d): %s", attempt + 1, MAX_RETRIES, e)
+            with tracer.start_as_current_span(
+                "genai.generate_images",
+                attributes={
+                    "genai.model": MODEL,
+                    "genai.operation": "generate_images",
+                    "genai.attempt": attempt + 1,
+                },
+            ) as span:
+                t0 = time.monotonic()
+                try:
+                    response = await self._client.aio.models.generate_images(
+                        model=MODEL,
+                        prompt=prompt,
+                        config=types.GenerateImagesConfig(
+                            number_of_images=1,
+                            aspect_ratio="1:1",
+                        ),
+                    )
+                    genai_request_duration.record(
+                        time.monotonic() - t0, {"operation": "generate_images"}
+                    )
+                    if response.generated_images:
+                        image_data = response.generated_images[0].image.image_bytes
+                        break
+                    log.warning("Imagen returned no images (attempt %d/%d)", attempt + 1, MAX_RETRIES)
+                    span.set_attribute("genai.empty_response", True)
+                except Exception as e:
+                    genai_errors.add(1, {"operation": "generate_images"})
+                    span.set_status(trace.StatusCode.ERROR, str(e))
+                    log.warning("Imagen error (attempt %d/%d): %s", attempt + 1, MAX_RETRIES, e)
             if attempt < MAX_RETRIES - 1:
                 await asyncio.sleep(2)
 
         if image_data is None:
             log.warning("Cover art generation failed after %d attempts, publishing without cover", MAX_RETRIES)
-            return gcs_path  # Return path anyway — story publishes without cover art
+            return gcs_path
 
         image = Image.open(io.BytesIO(image_data))
         image = image.resize((512, 512), Image.LANCZOS)
@@ -111,11 +133,31 @@ class VertexCoverGenerator(CoverGeneratorService):
         buf = io.BytesIO()
         image.save(buf, "WEBP", quality=85)
         buf.seek(0)
+        image_bytes = buf.read()
 
-        await self._storage.upload(
-            self._bucket_name, gcs_path, buf.read(),
-            content_type="image/webp",
-        )
+        with tracer.start_as_current_span(
+            "gcs.upload",
+            attributes={
+                "gcs.bucket": self._bucket_name,
+                "gcs.path": gcs_path,
+                "gcs.operation": "upload",
+                "gcs.bytes": len(image_bytes),
+            },
+        ) as span:
+            t0 = time.monotonic()
+            try:
+                await self._storage.upload(
+                    self._bucket_name, gcs_path, image_bytes,
+                    content_type="image/webp",
+                )
+                gcs_operation_duration.record(
+                    time.monotonic() - t0,
+                    {"operation": "upload", "bucket": self._bucket_name},
+                )
+            except Exception as e:
+                gcs_errors.add(1, {"operation": "upload", "bucket": self._bucket_name})
+                span.set_status(trace.StatusCode.ERROR, str(e))
+                raise
 
         return gcs_path
 

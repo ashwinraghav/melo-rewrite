@@ -6,10 +6,16 @@ ABC interface + production (Claude) and test (mock) implementations.
 from __future__ import annotations
 
 import json
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import anthropic
+from opentelemetry import trace
+
+from ..metrics import anthropic_request_duration, anthropic_errors
+
+tracer = trace.get_tracer(__name__)
 
 
 @dataclass
@@ -57,16 +63,33 @@ class StoryGeneratorService(ABC):
 
 
 class ClaudeStoryGenerator(StoryGeneratorService):
+    MODEL = "claude-sonnet-4-20250514"
+
     def __init__(self, api_key: str) -> None:
         self._client = anthropic.AsyncAnthropic(api_key=api_key)
 
     async def generate(self, prompt: str) -> GeneratedStory:
-        message = await self._client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=2048,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        with tracer.start_as_current_span(
+            "anthropic.messages.create",
+            attributes={"anthropic.model": self.MODEL, "anthropic.max_tokens": 2048},
+        ) as span:
+            t0 = time.monotonic()
+            try:
+                message = await self._client.messages.create(
+                    model=self.MODEL,
+                    max_tokens=2048,
+                    system=SYSTEM_PROMPT,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                duration = time.monotonic() - t0
+                anthropic_request_duration.record(duration, {"operation": "messages.create"})
+                span.set_attribute("anthropic.input_tokens", message.usage.input_tokens)
+                span.set_attribute("anthropic.output_tokens", message.usage.output_tokens)
+            except Exception as e:
+                anthropic_errors.add(1, {"operation": "messages.create"})
+                span.set_status(trace.StatusCode.ERROR, str(e))
+                raise
+
         raw = message.content[0].text
         data = json.loads(raw)
         return GeneratedStory(

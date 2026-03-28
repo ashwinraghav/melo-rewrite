@@ -2,10 +2,6 @@
 Static catalog publisher — generates JSON files for the story catalog
 and uploads them to GCS, served via Cloud CDN.
 
-This replaces the dynamic /v1/stories API endpoints for read access.
-The web client fetches static JSON from cdn.melostories.com instead of
-hitting the API server for every page load.
-
 Generated files:
   catalog/stories.json              — all published stories (list view)
   catalog/stories/{id}.json         — individual story detail (with text + segments)
@@ -16,13 +12,17 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from abc import ABC, abstractmethod
 
 from gcloud.aio.storage import Storage
+from opentelemetry import trace
 
+from ..metrics import gcs_operation_duration, gcs_errors
 from ..models.story import Story, StoryFilters, StorySegment
 
 log = logging.getLogger(__name__)
+tracer = trace.get_tracer(__name__)
 
 CDN_HOST = "cdn.melostories.com"
 
@@ -74,11 +74,30 @@ class GcsCatalogPublisher(CatalogPublisherService):
 
     async def _upload_json(self, path: str, data: dict | list) -> None:
         content = json.dumps(data, separators=(",", ":")).encode()
-        await self._storage.upload(
-            self._bucket_name, path, content,
-            content_type="application/json",
-            metadata={"cacheControl": CACHE_CONTROL},
-        )
+        with tracer.start_as_current_span(
+            "gcs.upload",
+            attributes={
+                "gcs.bucket": self._bucket_name,
+                "gcs.path": path,
+                "gcs.operation": "upload",
+                "gcs.bytes": len(content),
+            },
+        ) as span:
+            t0 = time.monotonic()
+            try:
+                await self._storage.upload(
+                    self._bucket_name, path, content,
+                    content_type="application/json",
+                    metadata={"cacheControl": CACHE_CONTROL},
+                )
+                gcs_operation_duration.record(
+                    time.monotonic() - t0,
+                    {"operation": "upload", "bucket": self._bucket_name},
+                )
+            except Exception as e:
+                gcs_errors.add(1, {"operation": "upload", "bucket": self._bucket_name})
+                span.set_status(trace.StatusCode.ERROR, str(e))
+                raise
 
     async def publish_catalog(self, stories: list[Story]) -> int:
         published = [s for s in stories if s.is_published]

@@ -1,18 +1,26 @@
 """
 Audio publishing service — ElevenLabs TTS + GCS upload.
 
-Extracted from scripts/generate-stories.py (lines 1358-1431).
 ABC interface + production (ElevenLabs) and test (mock) implementations.
 """
 from __future__ import annotations
 
 import base64
 import re
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 import httpx
 from gcloud.aio.storage import Storage
+from opentelemetry import trace
+
+from ..metrics import (
+    gcs_operation_duration, gcs_errors,
+    elevenlabs_request_duration, elevenlabs_errors,
+)
+
+tracer = trace.get_tracer(__name__)
 
 
 @dataclass
@@ -56,22 +64,40 @@ class ElevenLabsPublisher(AudioPublisherService):
 
     async def _generate_with_timestamps(self, text: str, voice_id: str | None = None) -> dict:
         vid = voice_id or self._voice_id
-        resp = await self._client.post(
-            f"{self.API_BASE}/text-to-speech/{vid}/with-timestamps",
-            headers={"Content-Type": "application/json"},
-            json={
-                "text": text,
-                "model_id": self._model_id,
-                "voice_settings": {
-                    "stability": 0.75,
-                    "similarity_boost": 0.75,
-                    "style": 0.3,
-                    "use_speaker_boost": True,
-                },
+        with tracer.start_as_current_span(
+            "elevenlabs.tts",
+            attributes={
+                "elevenlabs.operation": "text_to_speech",
+                "elevenlabs.voice_id": vid,
+                "elevenlabs.model_id": self._model_id,
+                "elevenlabs.text_length": len(text),
             },
-        )
-        resp.raise_for_status()
-        return resp.json()
+        ) as span:
+            t0 = time.monotonic()
+            try:
+                resp = await self._client.post(
+                    f"{self.API_BASE}/text-to-speech/{vid}/with-timestamps",
+                    headers={"Content-Type": "application/json"},
+                    json={
+                        "text": text,
+                        "model_id": self._model_id,
+                        "voice_settings": {
+                            "stability": 0.75,
+                            "similarity_boost": 0.75,
+                            "style": 0.3,
+                            "use_speaker_boost": True,
+                        },
+                    },
+                )
+                resp.raise_for_status()
+                elevenlabs_request_duration.record(
+                    time.monotonic() - t0, {"operation": "tts"}
+                )
+                return resp.json()
+            except Exception as e:
+                elevenlabs_errors.add(1, {"operation": "tts"})
+                span.set_status(trace.StatusCode.ERROR, str(e))
+                raise
 
     @staticmethod
     def _chars_to_sentence_segments(text: str, alignment: dict) -> list[dict]:
@@ -119,10 +145,29 @@ class ElevenLabsPublisher(AudioPublisherService):
     ) -> str:
         gcs_path = path_override or f"stories/{story_id}/audio.mp3"
         bucket_name = bucket_override or self._bucket_name
-        await self._storage.upload(
-            bucket_name, gcs_path, audio_bytes,
-            content_type="audio/mpeg",
-        )
+        with tracer.start_as_current_span(
+            "gcs.upload",
+            attributes={
+                "gcs.bucket": bucket_name,
+                "gcs.path": gcs_path,
+                "gcs.operation": "upload",
+                "gcs.bytes": len(audio_bytes),
+            },
+        ) as span:
+            t0 = time.monotonic()
+            try:
+                await self._storage.upload(
+                    bucket_name, gcs_path, audio_bytes,
+                    content_type="audio/mpeg",
+                )
+                gcs_operation_duration.record(
+                    time.monotonic() - t0,
+                    {"operation": "upload", "bucket": bucket_name},
+                )
+            except Exception as e:
+                gcs_errors.add(1, {"operation": "upload", "bucket": bucket_name})
+                span.set_status(trace.StatusCode.ERROR, str(e))
+                raise
         return gcs_path
 
     async def publish(

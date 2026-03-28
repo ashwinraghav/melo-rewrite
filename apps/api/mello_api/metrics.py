@@ -1,5 +1,5 @@
 """
-Business metric instruments for Mello API.
+Business and client metric instruments for Mello API.
 
 Safe to import unconditionally — when no MeterProvider is set (dev/test),
 all instruments return no-op instances that accept calls silently.
@@ -8,7 +8,7 @@ from opentelemetry import metrics
 
 meter = metrics.get_meter("mello_api")
 
-# ── Counters ──────────────────────────────────────────────────────────────────
+# ── Business counters ────────────────────────────────────────────────────────
 
 stories_generated = meter.create_counter(
     name="mello.stories.generated",
@@ -34,7 +34,7 @@ voice_clones_completed = meter.create_counter(
     unit="1",
 )
 
-# ── Histograms ────────────────────────────────────────────────────────────────
+# ── Business histograms ──────────────────────────────────────────────────────
 
 story_generation_duration = meter.create_histogram(
     name="mello.story.generation.duration",
@@ -46,4 +46,68 @@ story_publish_duration = meter.create_histogram(
     name="mello.story.publish.duration",
     description="Time to publish a story (audio + cover + embedding + catalog)",
     unit="s",
+)
+
+# ── Per-client duration histograms ───────────────────────────────────────────
+
+gcs_operation_duration = meter.create_histogram(
+    name="mello.gcs.duration",
+    description="GCS operation duration (upload/download)",
+    unit="s",
+)
+
+anthropic_request_duration = meter.create_histogram(
+    name="mello.anthropic.duration",
+    description="Anthropic Claude API request duration",
+    unit="s",
+)
+
+genai_request_duration = meter.create_histogram(
+    name="mello.genai.duration",
+    description="Google GenAI (Imagen/Embeddings) request duration",
+    unit="s",
+)
+
+cohere_request_duration = meter.create_histogram(
+    name="mello.cohere.duration",
+    description="Cohere rerank API request duration",
+    unit="s",
+)
+
+elevenlabs_request_duration = meter.create_histogram(
+    name="mello.elevenlabs.duration",
+    description="ElevenLabs API request duration",
+    unit="s",
+)
+
+# ── Per-client error counters ────────────────────────────────────────────────
+
+gcs_errors = meter.create_counter(
+    name="mello.gcs.errors",
+    description="GCS operation errors",
+    unit="1",
+)
+
+anthropic_errors = meter.create_counter(
+    name="mello.anthropic.errors",
+    description="Anthropic Claude API errors",
+    unit="1",
+)
+
+genai_errors = meter.create_counter(
+    name="mello.genai.errors",
+    description="Google GenAI errors",
+    unit="1",
+)
+
+cohere_errors = meter.create_counter(
+    name="mello.cohere.errors",
+    description="Cohere API errors",
+    unit="1",
+)
+
+elevenlabs_errors = meter.create_counter(
+    name="mello.elevenlabs.errors",
+    description="ElevenLabs API errors",
+    unit="1",
 )

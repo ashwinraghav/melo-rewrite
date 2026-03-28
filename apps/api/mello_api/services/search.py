@@ -4,17 +4,17 @@ Semantic search service — Firestore vector search + Cohere rerank.
 1. Embed the user query via EmbeddingService
 2. Firestore find_nearest (KNN) → top candidates with cosine similarity
 3. Cohere Rerank the candidates → final ranked playlist
-
-Previously this used in-memory cosine similarity with a Python cache.
-Now it delegates to Firestore's native vector search, eliminating the
-need to load all embeddings into memory.
 """
 from __future__ import annotations
 
 import logging
+import time
 from typing import TYPE_CHECKING
 
 import cohere
+from opentelemetry import trace
+
+from ..metrics import cohere_request_duration, cohere_errors
 
 if TYPE_CHECKING:
     from ..models.story import Story
@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from .embedding import EmbeddingService
 
 log = logging.getLogger(__name__)
+tracer = trace.get_tracer(__name__)
 
 RETRIEVAL_K = 20  # candidates from vector search
 
@@ -73,12 +74,30 @@ class SearchService:
                 f"{story.title}. {story.description}. {story.themes}"
                 for story, _ in candidates
             ]
-            response = await self._cohere.rerank(
-                model="rerank-v3.5",
-                query=query,
-                documents=documents,
-                top_n=limit,
-            )
+            with tracer.start_as_current_span(
+                "cohere.rerank",
+                attributes={
+                    "cohere.model": "rerank-v3.5",
+                    "cohere.num_documents": len(documents),
+                    "cohere.top_n": limit,
+                },
+            ) as span:
+                t0 = time.monotonic()
+                try:
+                    response = await self._cohere.rerank(
+                        model="rerank-v3.5",
+                        query=query,
+                        documents=documents,
+                        top_n=limit,
+                    )
+                    cohere_request_duration.record(
+                        time.monotonic() - t0, {"operation": "rerank"}
+                    )
+                except Exception as e:
+                    cohere_errors.add(1, {"operation": "rerank"})
+                    span.set_status(trace.StatusCode.ERROR, str(e))
+                    raise
+
             results = []
             for item in response.results:
                 story, _ = candidates[item.index]

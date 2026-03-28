@@ -8,14 +8,19 @@ from __future__ import annotations
 
 import hashlib
 import struct
+import time
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 from google import genai
+from opentelemetry import trace
+
+from ..metrics import genai_request_duration, genai_errors
 
 if TYPE_CHECKING:
     from ..models.story import Story
 
+tracer = trace.get_tracer(__name__)
 EMBEDDING_MODEL = "text-embedding-005"
 
 
@@ -36,11 +41,24 @@ class VertexEmbeddingService(EmbeddingService):
         )
 
     async def embed_text(self, text: str) -> list[float]:
-        response = await self._client.aio.models.embed_content(
-            model=EMBEDDING_MODEL,
-            contents=text,
-        )
-        return list(response.embeddings[0].values)
+        with tracer.start_as_current_span(
+            "genai.embed_content",
+            attributes={"genai.model": EMBEDDING_MODEL, "genai.operation": "embed"},
+        ) as span:
+            t0 = time.monotonic()
+            try:
+                response = await self._client.aio.models.embed_content(
+                    model=EMBEDDING_MODEL,
+                    contents=text,
+                )
+                genai_request_duration.record(
+                    time.monotonic() - t0, {"operation": "embed_content"}
+                )
+                return list(response.embeddings[0].values)
+            except Exception as e:
+                genai_errors.add(1, {"operation": "embed_content"})
+                span.set_status(trace.StatusCode.ERROR, str(e))
+                raise
 
 
 class MockEmbeddingService(EmbeddingService):

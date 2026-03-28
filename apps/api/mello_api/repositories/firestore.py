@@ -4,6 +4,7 @@ Signed URLs use ADC — the service account must have serviceAccountTokenCreator
 """
 from __future__ import annotations
 import asyncio
+import time
 from datetime import timedelta, datetime, timezone
 from typing import TYPE_CHECKING
 import google.auth
@@ -11,6 +12,8 @@ from google.auth.transport.requests import Request as GoogleAuthRequest
 from google.cloud import storage as gcs
 from google.oauth2.service_account import Credentials as SACredentials
 from google.cloud.firestore_v1.vector import Vector
+from opentelemetry import trace
+from ..metrics import gcs_operation_duration, gcs_errors
 from ..models.story import Story, StoryFilters, StorySegment, categorize_duration
 from ..models.user import UserProfile
 from ..models.listening import Favorite, HistoryEntry
@@ -22,6 +25,8 @@ from .interfaces import (
 
 if TYPE_CHECKING:
     from google.cloud.firestore_v1.async_client import AsyncClient
+
+_tracer = trace.get_tracer(__name__)
 
 
 def _now() -> str:
@@ -220,10 +225,38 @@ class FirestoreStoryRepository(StoryRepository):
             )
 
     async def get_audio_signed_url(self, story_id: str, audio_path: str) -> str:
-        return await asyncio.to_thread(self._signed_url_sync, audio_path)
+        with _tracer.start_as_current_span(
+            "gcs.signed_url",
+            attributes={"gcs.path": audio_path, "gcs.operation": "signed_url"},
+        ) as span:
+            t0 = time.monotonic()
+            try:
+                url = await asyncio.to_thread(self._signed_url_sync, audio_path)
+                gcs_operation_duration.record(
+                    time.monotonic() - t0, {"operation": "signed_url"}
+                )
+                return url
+            except Exception as e:
+                gcs_errors.add(1, {"operation": "signed_url"})
+                span.set_status(trace.StatusCode.ERROR, str(e))
+                raise
 
     async def get_cover_art_signed_url(self, story_id: str, cover_art_path: str) -> str:
-        return await asyncio.to_thread(self._signed_url_sync, cover_art_path)
+        with _tracer.start_as_current_span(
+            "gcs.signed_url",
+            attributes={"gcs.path": cover_art_path, "gcs.operation": "signed_url"},
+        ) as span:
+            t0 = time.monotonic()
+            try:
+                url = await asyncio.to_thread(self._signed_url_sync, cover_art_path)
+                gcs_operation_duration.record(
+                    time.monotonic() - t0, {"operation": "signed_url"}
+                )
+                return url
+            except Exception as e:
+                gcs_errors.add(1, {"operation": "signed_url"})
+                span.set_status(trace.StatusCode.ERROR, str(e))
+                raise
 
     async def get_cover_art_public_url(self, cover_art_path: str) -> str:
         return f"https://cdn.melostories.com/{cover_art_path}"

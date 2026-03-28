@@ -186,10 +186,84 @@ resource "google_monitoring_dashboard" "mello_api" {
           }
         ],
 
-        # ── Row 4: Infrastructure ────────────────────────────────────────
+        # ── Row 4: Client Durations (p50 / p95) ─────────────────────────
+        [
+          for i, metric_info in [
+            { name = "gcs.duration",         title = "GCS" },
+            { name = "anthropic.duration",   title = "Anthropic (Claude)" },
+            { name = "genai.duration",       title = "GenAI (Imagen/Embed)" },
+            { name = "elevenlabs.duration",  title = "ElevenLabs" },
+            { name = "cohere.duration",      title = "Cohere" },
+          ] : {
+            xPos   = (i % 5) * 10
+            yPos   = 48
+            width  = 10
+            height = 12
+            widget = {
+              title = "${metric_info.title} Latency"
+              xyChart = {
+                dataSets = [
+                  for percentile in [50, 95] : {
+                    timeSeriesQuery = {
+                      timeSeriesFilter = {
+                        filter = "metric.type=\"custom.googleapis.com/opencensus/mello.${metric_info.name}\""
+                        aggregation = {
+                          alignmentPeriod  = "300s"
+                          perSeriesAligner = "ALIGN_PERCENTILE_${percentile}"
+                          crossSeriesReducer = "REDUCE_MEAN"
+                        }
+                      }
+                    }
+                    plotType = "LINE"
+                  }
+                ]
+                yAxis = { label = "seconds" }
+              }
+            }
+          }
+        ],
+
+        # ── Row 5: Client Errors ─────────────────────────────────────────
+        [
+          for i, metric_info in [
+            { name = "gcs.errors",         title = "GCS Errors" },
+            { name = "anthropic.errors",   title = "Anthropic Errors" },
+            { name = "genai.errors",       title = "GenAI Errors" },
+            { name = "elevenlabs.errors",  title = "ElevenLabs Errors" },
+            { name = "cohere.errors",      title = "Cohere Errors" },
+          ] : {
+            xPos   = (i % 5) * 10
+            yPos   = 60
+            width  = 10
+            height = 12
+            widget = {
+              title = metric_info.title
+              xyChart = {
+                dataSets = [
+                  {
+                    timeSeriesQuery = {
+                      timeSeriesFilter = {
+                        filter = "metric.type=\"custom.googleapis.com/opencensus/mello.${metric_info.name}\""
+                        aggregation = {
+                          alignmentPeriod  = "300s"
+                          perSeriesAligner = "ALIGN_DELTA"
+                          crossSeriesReducer = "REDUCE_SUM"
+                          groupByFields = ["metric.labels.operation"]
+                        }
+                      }
+                    }
+                    plotType = "STACKED_BAR"
+                  }
+                ]
+              }
+            }
+          }
+        ],
+
+        # ── Row 6: Infrastructure ────────────────────────────────────────
         [
           {
-            yPos   = 48
+            yPos   = 72
             width  = 12
             height = 12
             widget = {
@@ -215,7 +289,7 @@ resource "google_monitoring_dashboard" "mello_api" {
           },
           {
             xPos   = 12
-            yPos   = 48
+            yPos   = 72
             width  = 12
             height = 12
             widget = {
@@ -242,7 +316,7 @@ resource "google_monitoring_dashboard" "mello_api" {
           },
           {
             xPos   = 24
-            yPos   = 48
+            yPos   = 72
             width  = 12
             height = 12
             widget = {
@@ -269,7 +343,7 @@ resource "google_monitoring_dashboard" "mello_api" {
           },
           {
             xPos   = 36
-            yPos   = 48
+            yPos   = 72
             width  = 12
             height = 12
             widget = {

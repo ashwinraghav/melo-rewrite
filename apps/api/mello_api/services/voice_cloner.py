@@ -5,11 +5,20 @@ ABC interface + production (ElevenLabs) and test (mock) implementations.
 """
 from __future__ import annotations
 
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import httpx
 from gcloud.aio.storage import Storage
+from opentelemetry import trace
+
+from ..metrics import (
+    gcs_operation_duration, gcs_errors,
+    elevenlabs_request_duration, elevenlabs_errors,
+)
+
+tracer = trace.get_tracer(__name__)
 
 
 @dataclass
@@ -46,41 +55,128 @@ class ElevenLabsVoiceCloner(VoiceClonerService):
         self._storage = Storage()
 
     async def clone_voice(self, name: str, audio_bytes: bytes) -> CloneResult:
-        resp = await self._client.post(
-            f"{self.API_BASE}/voices/add",
-            data={
-                "name": f"mello-{name}",
-                "description": f"Mello custom voice: {name}",
+        with tracer.start_as_current_span(
+            "elevenlabs.clone_voice",
+            attributes={
+                "elevenlabs.operation": "clone_voice",
+                "elevenlabs.audio_bytes": len(audio_bytes),
             },
-            files={"files": ("sample.webm", audio_bytes, "audio/webm")},
-        )
-        resp.raise_for_status()
-        return CloneResult(eleven_labs_voice_id=resp.json()["voice_id"])
+        ) as span:
+            t0 = time.monotonic()
+            try:
+                resp = await self._client.post(
+                    f"{self.API_BASE}/voices/add",
+                    data={
+                        "name": f"mello-{name}",
+                        "description": f"Mello custom voice: {name}",
+                    },
+                    files={"files": ("sample.webm", audio_bytes, "audio/webm")},
+                )
+                resp.raise_for_status()
+                elevenlabs_request_duration.record(
+                    time.monotonic() - t0, {"operation": "clone_voice"}
+                )
+                return CloneResult(eleven_labs_voice_id=resp.json()["voice_id"])
+            except Exception as e:
+                elevenlabs_errors.add(1, {"operation": "clone_voice"})
+                span.set_status(trace.StatusCode.ERROR, str(e))
+                raise
 
     async def delete_voice(self, eleven_labs_voice_id: str) -> None:
-        resp = await self._client.delete(
-            f"{self.API_BASE}/voices/{eleven_labs_voice_id}",
-        )
-        resp.raise_for_status()
+        with tracer.start_as_current_span(
+            "elevenlabs.delete_voice",
+            attributes={"elevenlabs.operation": "delete_voice"},
+        ) as span:
+            t0 = time.monotonic()
+            try:
+                resp = await self._client.delete(
+                    f"{self.API_BASE}/voices/{eleven_labs_voice_id}",
+                )
+                resp.raise_for_status()
+                elevenlabs_request_duration.record(
+                    time.monotonic() - t0, {"operation": "delete_voice"}
+                )
+            except Exception as e:
+                elevenlabs_errors.add(1, {"operation": "delete_voice"})
+                span.set_status(trace.StatusCode.ERROR, str(e))
+                raise
 
     async def upload_sample(self, uid: str, voice_id: str, audio_bytes: bytes) -> str:
         path = f"voices/{uid}/{voice_id}/sample.webm"
-        await self._storage.upload(
-            self._firebase_bucket, path, audio_bytes,
-            content_type="audio/webm",
-        )
+        with tracer.start_as_current_span(
+            "gcs.upload",
+            attributes={
+                "gcs.bucket": self._firebase_bucket,
+                "gcs.path": path,
+                "gcs.operation": "upload",
+                "gcs.bytes": len(audio_bytes),
+            },
+        ) as span:
+            t0 = time.monotonic()
+            try:
+                await self._storage.upload(
+                    self._firebase_bucket, path, audio_bytes,
+                    content_type="audio/webm",
+                )
+                gcs_operation_duration.record(
+                    time.monotonic() - t0,
+                    {"operation": "upload", "bucket": self._firebase_bucket},
+                )
+            except Exception as e:
+                gcs_errors.add(1, {"operation": "upload", "bucket": self._firebase_bucket})
+                span.set_status(trace.StatusCode.ERROR, str(e))
+                raise
         return path
 
     async def upload_conversion(self, uid: str, voice_id: str, story_id: str, audio_bytes: bytes) -> str:
         path = f"voices/{uid}/{voice_id}/conversions/{story_id}.mp3"
-        await self._storage.upload(
-            self._firebase_bucket, path, audio_bytes,
-            content_type="audio/mpeg",
-        )
+        with tracer.start_as_current_span(
+            "gcs.upload",
+            attributes={
+                "gcs.bucket": self._firebase_bucket,
+                "gcs.path": path,
+                "gcs.operation": "upload",
+                "gcs.bytes": len(audio_bytes),
+            },
+        ) as span:
+            t0 = time.monotonic()
+            try:
+                await self._storage.upload(
+                    self._firebase_bucket, path, audio_bytes,
+                    content_type="audio/mpeg",
+                )
+                gcs_operation_duration.record(
+                    time.monotonic() - t0,
+                    {"operation": "upload", "bucket": self._firebase_bucket},
+                )
+            except Exception as e:
+                gcs_errors.add(1, {"operation": "upload", "bucket": self._firebase_bucket})
+                span.set_status(trace.StatusCode.ERROR, str(e))
+                raise
         return path
 
     async def download_sample(self, path: str) -> bytes:
-        return await self._storage.download(self._firebase_bucket, path)
+        with tracer.start_as_current_span(
+            "gcs.download",
+            attributes={
+                "gcs.bucket": self._firebase_bucket,
+                "gcs.path": path,
+                "gcs.operation": "download",
+            },
+        ) as span:
+            t0 = time.monotonic()
+            try:
+                data = await self._storage.download(self._firebase_bucket, path)
+                gcs_operation_duration.record(
+                    time.monotonic() - t0,
+                    {"operation": "download", "bucket": self._firebase_bucket},
+                )
+                span.set_attribute("gcs.bytes", len(data))
+                return data
+            except Exception as e:
+                gcs_errors.add(1, {"operation": "download", "bucket": self._firebase_bucket})
+                span.set_status(trace.StatusCode.ERROR, str(e))
+                raise
 
     async def get_download_url(self, path: str) -> str:
         return f"https://storage.googleapis.com/{self._firebase_bucket}/{path}"

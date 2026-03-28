@@ -12,6 +12,16 @@ from mello_api.metrics import (
     voice_clones_completed,
     story_generation_duration,
     story_publish_duration,
+    gcs_operation_duration,
+    gcs_errors,
+    anthropic_request_duration,
+    anthropic_errors,
+    genai_request_duration,
+    genai_errors,
+    cohere_request_duration,
+    cohere_errors,
+    elevenlabs_request_duration,
+    elevenlabs_errors,
 )
 
 
@@ -96,10 +106,24 @@ class TestCloudJsonFormatter:
 # ── Metrics instruments ───────────────────────────────────────────────────────
 
 def test_metric_instruments_are_callable():
-    """Metrics should accept calls without error (no-op in test mode)."""
+    """All metric instruments should accept calls without error (no-op in test mode)."""
+    # Business counters
     stories_generated.add(1)
     stories_published.add(1)
     searches_performed.add(1)
     voice_clones_completed.add(1)
+    # Business histograms
     story_generation_duration.record(1.5)
     story_publish_duration.record(10.0)
+    # Per-client duration histograms
+    gcs_operation_duration.record(0.5, {"operation": "upload", "bucket": "test"})
+    anthropic_request_duration.record(2.0, {"operation": "messages.create"})
+    genai_request_duration.record(1.0, {"operation": "embed_content"})
+    cohere_request_duration.record(0.3, {"operation": "rerank"})
+    elevenlabs_request_duration.record(30.0, {"operation": "tts"})
+    # Per-client error counters
+    gcs_errors.add(1, {"operation": "upload", "bucket": "test"})
+    anthropic_errors.add(1, {"operation": "messages.create"})
+    genai_errors.add(1, {"operation": "embed_content"})
+    cohere_errors.add(1, {"operation": "rerank"})
+    elevenlabs_errors.add(1, {"operation": "tts"})
