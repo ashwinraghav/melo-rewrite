@@ -111,15 +111,40 @@ From the Stitch project "Editorial Serenity" (project ID 13037681786636023062).
 - Ambient shadows: 32px blur, 6% opacity, tinted `on-surface`
 - Ghost borders only: `outline-variant` at 15% opacity max
 
-## Error monitoring (Sentry)
+## Observability
 
-**Dashboard:** https://spectrum-bridge.sentry.io/issues/
+### Quick links
+
+| Tool | What | URL |
+|------|------|-----|
+| Dashboard | Single pane of glass — request health, business metrics, pipeline durations, infra | https://console.cloud.google.com/monitoring/dashboards?project=melo-f5756 → "Mello API" |
+| Traces | Request waterfalls (FastAPI → Firestore → ElevenLabs → etc.) | https://console.cloud.google.com/traces/list?project=melo-f5756 |
+| Logs | Structured JSON with clickable trace links | https://console.cloud.google.com/logs/query?project=melo-f5756 |
+| Metrics | Counters + histograms (custom + Cloud Run built-in) | https://console.cloud.google.com/monitoring/metrics-explorer?project=melo-f5756 |
+| Errors | Error grouping + alerts (Sentry) | https://spectrum-bridge.sentry.io/issues/ |
+| Cloud Run | Service health, revisions, scaling | https://console.cloud.google.com/run/detail/us-central1/mello-api?project=melo-f5756 |
+
+### OpenTelemetry (API backend)
+
+Tracing, metrics, and log correlation via OpenTelemetry → Google Cloud native tools.
+Configured in `apps/api/mello_api/telemetry.py`. **Production only** — no-op in dev/test.
+
+- **Auto-instrumented:** FastAPI requests, httpx (ElevenLabs, Anthropic, Cohere), gRPC (Firestore, Cloud Tasks, Vertex AI)
+- **Manual spans:** Publish pipeline steps in `routes/tasks.py` (audio, cover, embedding, finalize)
+- **Business metrics:** `mello.stories.generated`, `mello.stories.published`, `mello.searches.performed`,
+  `mello.voice_clones.completed`, `mello.story.generation.duration`, `mello.story.publish.duration`
+- **Log correlation:** JSON logs include `logging.googleapis.com/trace` for clickable links in Cloud Logging
+- **Propagation:** W3C Trace Context + X-Cloud-Trace-Context (Cloud Run load balancer)
+- **IAM:** Service account has `roles/cloudtrace.agent` + `roles/monitoring.metricWriter`
+
+### Sentry (error monitoring)
+
 **Org:** `spectrum-bridge` | **Project:** `javascript-nextjs`
 
 - **Frontend** (`@sentry/nextjs`): client-side error capture, session replay, `global-error.tsx` boundary.
   Config in `apps/web/src/instrumentation-client.ts`.
-- **Backend** (`sentry-sdk[fastapi]`): auto-captures unhandled route errors.
-  Init in `apps/api/mello_api/asgi.py`.
+- **Backend** (`sentry-sdk[fastapi]`): auto-captures unhandled route errors. `traces_sample_rate=0`
+  (OTel handles tracing). Init in `apps/api/mello_api/asgi.py`.
 - DSN is a public identifier, not a secret. No Sentry secrets in Secret Manager.
 - Source map uploads use `SENTRY_AUTH_TOKEN` (build-time only, local `.env.local`).
 
