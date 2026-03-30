@@ -53,13 +53,13 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     }
   }, [profileTermsVersion])
 
-  // Show nothing while loading auth or profile
-  if (loading || (user && profileLoading)) {
+  // Show nothing while auth is loading (need to know if user exists for protected routes)
+  if (loading) {
     return null
   }
 
-  // Show terms gate if user hasn't accepted current terms
-  if (user && !termsAccepted) {
+  // Show terms gate only after profile has loaded and we know terms are stale
+  if (user && !profileLoading && !termsAccepted) {
     return <TermsGate onAccepted={() => setTermsAccepted(true)} />
   }
 

@@ -31,6 +31,7 @@ terraform.tfvars
 *.json
 !package.json
 !tsconfig*.json
+!apps/web/public/manifest.json
 !turbo.json
 !vitest.config*.json
 !**/fixtures/**/*.json
