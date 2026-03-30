@@ -44,6 +44,13 @@ export function useAuth(): AuthState {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser)
       setLoading(false)
+      // Set a hint cookie so Next.js middleware can redirect server-side
+      // (not a security check — real auth is Firebase ID token verification)
+      if (firebaseUser) {
+        document.cookie = 'mello-auth=1; path=/; max-age=2592000; SameSite=Lax'
+      } else {
+        document.cookie = 'mello-auth=; path=/; max-age=0'
+      }
     })
     return unsubscribe
   }, [])

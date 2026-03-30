@@ -6,6 +6,7 @@
  * Clicking a story navigates to the player with playlist context.
  */
 
+import Image from 'next/image'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
@@ -159,11 +160,12 @@ export function StoriesContent() {
             {/* Cover art thumbnail */}
             <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-xl bg-surface-container-high">
               {story.coverArtUrl ? (
-                <img
+                <Image
                   src={story.coverArtUrl}
                   alt=""
-                  className="h-full w-full object-cover"
-                  loading="lazy"
+                  fill
+                  sizes="48px"
+                  className="object-cover"
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center">

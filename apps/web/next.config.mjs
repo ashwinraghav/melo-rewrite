@@ -2,12 +2,24 @@ import { withSentryConfig } from '@sentry/nextjs'
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Static export for Firebase Hosting CDN
-  output: 'export',
+  // SSR mode — deployed via Firebase App Hosting (Cloud Run)
+  output: 'standalone',
 
-  // next/image optimization isn't available in static export
   images: {
-    unoptimized: true,
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'cdn.melostories.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'storage.googleapis.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.googleusercontent.com',
+      },
+    ],
   },
 
   // Expose API URL to the client (non-secret)

@@ -12,6 +12,7 @@
  * the player restores results. TanStack Query caches by key.
  */
 
+import Image from 'next/image'
 import { useState, useCallback, useRef, } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
@@ -233,9 +234,9 @@ export function SearchContent() {
                   onClick={() => { trackStorySelected(story.id, story.title, 'search'); router.push(`/player?id=${story.id}`) }}
                   className="glass-card flex items-center gap-4 rounded-[1rem] p-4 text-left transition-all duration-300 hover:bg-surface-container-high/40 active:scale-[0.98]"
                 >
-                  <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl bg-surface-container-high">
+                  <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl bg-surface-container-high">
                     {story.coverArtUrl ? (
-                      <img src={story.coverArtUrl} alt="" className="h-full w-full object-cover" />
+                      <Image src={story.coverArtUrl} alt="" fill sizes="56px" className="object-cover" />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
                         <Icon name="auto_stories" size={20} className="text-on-surface-variant/30" />

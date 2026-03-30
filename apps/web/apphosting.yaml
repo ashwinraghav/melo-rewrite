@@ -1,0 +1,40 @@
+# Firebase App Hosting — Next.js SSR on Cloud Run
+# https://firebase.google.com/docs/app-hosting/configure
+
+runConfig:
+  minInstances: 0
+  maxInstances: 4
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 512
+
+env:
+  # Public identifiers — safe to commit
+  - variable: NEXT_PUBLIC_API_URL
+    value: https://mello-api-rhp2tqs5qa-uc.a.run.app
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: AIzaSyCBH3p0XEB1OuYl03YX8W9f8jbU-jhrwVg
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: melostories.com
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: melo-f5756
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: melo-f5756.firebasestorage.app
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "888632552624"
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: 1:888632552624:web:fd61ffda6ea81926fc5f75
+  - variable: NEXT_PUBLIC_SENTRY_DSN
+    value: https://fb605438406d94da9061258e2efc4004@o4511110152585216.ingest.us.sentry.io/4511110153502720
+  - variable: NEXT_PUBLIC_SENTRY_ENVIRONMENT
+    value: production
+
+  # Sentry source map uploads (build-time only)
+  - variable: SENTRY_ORG
+    value: spectrum-bridge
+  - variable: SENTRY_PROJECT
+    value: javascript-nextjs
+  # SENTRY_AUTH_TOKEN should be stored as a Firebase App Hosting secret:
+  #   firebase apphosting:secrets:set SENTRY_AUTH_TOKEN
+  # - variable: SENTRY_AUTH_TOKEN
+  #   secret: SENTRY_AUTH_TOKEN

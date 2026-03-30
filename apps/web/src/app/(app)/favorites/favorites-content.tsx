@@ -6,6 +6,7 @@
  * story details from the API.
  */
 
+import Image from 'next/image'
 import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
@@ -105,12 +106,15 @@ export function FavoritesContent() {
               {storyLoading ? (
                 <div className="aspect-square w-full animate-pulse bg-surface-container-high" />
               ) : story?.coverArtUrl ? (
-                <img
-                  src={story.coverArtUrl}
-                  alt={story.title}
-                  className="aspect-square w-full object-cover"
-                  loading="lazy"
-                />
+                <div className="relative aspect-square w-full">
+                  <Image
+                    src={story.coverArtUrl}
+                    alt={story.title}
+                    fill
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                    className="object-cover"
+                  />
+                </div>
               ) : (
                 <div className="flex aspect-square w-full items-center justify-center bg-surface-container-high">
                   <Icon name="auto_stories" size={32} className="text-on-surface-variant/30" />

@@ -2,10 +2,8 @@
  * Sentry client-side SDK initialisation.
  *
  * This file is automatically loaded by @sentry/nextjs as the browser entry
- * point. It runs once when the page loads.
- *
- * Since the app uses `output: 'export'` (static site on Firebase Hosting),
- * only client-side instrumentation is relevant — there is no server runtime.
+ * point. It runs once when the page loads. Server-side Sentry init is in
+ * instrumentation.ts.
  */
 
 import * as Sentry from '@sentry/nextjs'

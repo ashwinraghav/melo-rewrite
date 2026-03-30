@@ -1,16 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Deploy web frontend to Firebase Hosting CDN.
+# Deploy web frontend via Firebase App Hosting (SSR on Cloud Run).
+#
+# Firebase App Hosting builds and deploys from the repo. This script:
+#   1. Runs tests (unless --skip-tests)
+#   2. Builds locally to catch errors early
+#   3. Creates a new App Hosting rollout
+#
+# First-time setup:
+#   firebase apphosting:backends:create --project melo-f5756 \
+#     --location us-central1 --app-directory apps/web
+#
 # Usage: ./scripts/deploy-web.sh [--skip-tests]
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-API_URL="${NEXT_PUBLIC_API_URL:-https://mello-api-rhp2tqs5qa-uc.a.run.app}"
-AUTH_DOMAIN="${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:-melostories.com}"
-SENTRY_DSN="${NEXT_PUBLIC_SENTRY_DSN:-https://fb605438406d94da9061258e2efc4004@o4511110152585216.ingest.us.sentry.io/4511110153502720}"
 
-echo "── Deploy Web ─────────────────────────────────────────"
+echo "── Deploy Web (SSR / App Hosting) ────────────────────"
 
 # Tests
 if [[ "${1:-}" != "--skip-tests" ]]; then
@@ -22,19 +29,14 @@ fi
 echo "→ Building types..."
 pnpm --filter @mello/types build
 
-# Build static export with production API URL and same-origin authDomain
-echo "→ Building static export (API_URL=$API_URL, AUTH_DOMAIN=$AUTH_DOMAIN)..."
-NEXT_PUBLIC_API_URL="$API_URL" \
-  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="$AUTH_DOMAIN" \
-  NEXT_PUBLIC_SENTRY_DSN="$SENTRY_DSN" \
-  NEXT_PUBLIC_SENTRY_ENVIRONMENT=production \
-  SENTRY_AUTH_TOKEN="${SENTRY_AUTH_TOKEN:-}" \
-  SENTRY_ORG="${SENTRY_ORG:-}" \
-  SENTRY_PROJECT="${SENTRY_PROJECT:-}" \
-  pnpm --filter @mello/web build
+# Local build to catch errors before triggering a remote build
+echo "→ Verifying build..."
+pnpm --filter @mello/web build
 
-# Deploy
-echo "→ Deploying to Firebase Hosting..."
-firebase deploy --only hosting --project melo-f5756
+# Trigger App Hosting rollout
+echo "→ Creating App Hosting rollout..."
+firebase apphosting:rollouts:create --project melo-f5756 \
+  --backend mello-web --location us-central1
 
-echo "✓ Web deployed to https://melo-f5756.web.app"
+echo "✓ Rollout triggered. Check status:"
+echo "  firebase apphosting:rollouts:list --project melo-f5756 --backend mello-web"

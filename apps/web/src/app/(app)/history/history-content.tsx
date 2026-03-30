@@ -6,6 +6,7 @@
  * consistent with the favorites page approach.
  */
 
+import Image from 'next/image'
 import { useQuery, useQueries } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
@@ -128,11 +129,12 @@ export function HistoryContent() {
               {/* Cover art thumbnail */}
               <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl bg-surface-container-high">
                 {story?.coverArtUrl ? (
-                  <img
+                  <Image
                     src={story.coverArtUrl}
                     alt=""
-                    className="h-full w-full object-cover"
-                    loading="lazy"
+                    fill
+                    sizes="56px"
+                    className="object-cover"
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center">

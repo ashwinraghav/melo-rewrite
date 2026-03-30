@@ -8,6 +8,7 @@
  * so the transition is seamless — no page reload, no loading spinner.
  */
 
+import Image from 'next/image'
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -236,10 +237,13 @@ export function PlayerContent() {
                 compact ? "mb-3" : "mb-5",
               )}
             >
-              <img
+              <Image
                 src={story.coverArtUrl}
                 alt={story.title}
-                className="h-full w-full object-cover"
+                fill
+                sizes="192px"
+                className="object-cover"
+                priority
               />
             </motion.div>
           )}
