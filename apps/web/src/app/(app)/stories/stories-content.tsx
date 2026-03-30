@@ -9,7 +9,7 @@
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { fetchStoryList } from '@/lib/cdn'
+import { useApiClient } from '@/hooks/useApiClient'
 import { Icon } from '@/components/icon'
 import { trackPlayAll, trackStorySelected } from '@/lib/analytics'
 import type { PaginatedResponse, StoryWithAudioUrl } from '@mello/types'
@@ -58,10 +58,12 @@ export function StoriesContent() {
   const router = useRouter()
   const topics = searchParams.get('topics') ?? ''
 
-  // Fetch from static CDN catalog — no auth needed, no API server hit
+  const client = useApiClient()
+
   const { data, isLoading } = useQuery({
     queryKey: ['stories', topics],
-    queryFn: () => fetchStoryList<StoryWithAudioUrl>(topics || undefined),
+    queryFn: () => client.getList<StoryWithAudioUrl>(topics ? `/v1/stories?topics=${topics}` : '/v1/stories'),
+    staleTime: 60_000,
   })
 
   const stories = (data as PaginatedResponse<StoryWithAudioUrl> | undefined)?.data ?? []
@@ -78,7 +80,7 @@ export function StoriesContent() {
 
   return (
     <div className="px-6 py-8 pb-28">
-      {/* Header — renders immediately from static HTML, before JS or auth */}
+      {/* Header */}
       <div className="mb-6">
         <div className="mb-6 flex items-center gap-3">
           <button

@@ -1,9 +1,7 @@
 /**
  * BottomNav component tests.
  *
- * Verifies the nav renders Home, Create tabs and a profile avatar button.
- * Search moved to the top-right overlay; Favorites/History are in the
- * account menu (opened via the profile avatar in the bottom nav).
+ * Verifies the nav renders Home, Search, Create tabs and a profile avatar.
  */
 
 import { describe, it, expect, vi } from 'vitest'
@@ -27,24 +25,24 @@ describe('BottomNav', () => {
     expect(screen.getByRole('navigation', { name: /main navigation/i })).toBeInTheDocument()
   })
 
-  it('shows Home and Create tabs plus profile button', () => {
+  it('shows Home, Search, Create tabs and profile', () => {
     render(<BottomNav />)
     expect(screen.getByText('Home')).toBeInTheDocument()
+    expect(screen.getByText('Search')).toBeInTheDocument()
     expect(screen.getByText('Create')).toBeInTheDocument()
     expect(screen.getByText('You')).toBeInTheDocument()
   })
 
-  it('does NOT show Search, Favorites, or History tabs', () => {
+  it('does NOT show Favorites or History tabs directly', () => {
     render(<BottomNav />)
-    expect(screen.queryByText('Search')).not.toBeInTheDocument()
     expect(screen.queryByText('Favorites')).not.toBeInTheDocument()
     expect(screen.queryByText('History')).not.toBeInTheDocument()
   })
 
-  it('renders exactly 2 tab links', () => {
+  it('renders exactly 3 tab links', () => {
     render(<BottomNav />)
     const links = screen.getAllByRole('link')
-    expect(links).toHaveLength(2)
+    expect(links).toHaveLength(3)
   })
 
   it('marks the active tab with aria-current', () => {

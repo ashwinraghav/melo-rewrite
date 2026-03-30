@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import { CURRENT_TERMS_VERSION } from '@mello/types'
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy — Mello',
-  description: 'Mello Privacy Policy',
+  title: 'Privacy Policy — Melo',
+  description: 'Melo Privacy Policy',
 }
 
 export default function PrivacyPage() {
@@ -18,12 +18,12 @@ export default function PrivacyPage() {
 
       <div className="space-y-8 font-body text-sm leading-relaxed text-on-surface-variant">
         <p>
-          Mello provides a web-based platform that delivers audio stories for young children. This
+          Melo provides a web-based platform that delivers audio stories for young children. This
           Privacy Policy describes how we collect, use, disclose, and protect your information when
           you use our Service.
         </p>
         <p>
-          <strong className="text-on-surface">Mello is designed for adults.</strong> The Service is
+          <strong className="text-on-surface">Melo is designed for adults.</strong> The Service is
           intended for use by parents and legal guardians (age 18 or older) who share content with
           their children under direct supervision. We do not knowingly collect personal information
           directly from children.
@@ -87,7 +87,7 @@ export default function PrivacyPage() {
 
         <Section title="4. Children's Privacy">
           <p>
-            Mello is not directed to children under 13 within the meaning of the Children&apos;s
+            Melo is not directed to children under 13 within the meaning of the Children&apos;s
             Online Privacy Protection Act (&quot;COPPA&quot;). We do not knowingly collect personal
             information from children under 13. All account creation and data input is performed by
             the parent or guardian.
@@ -118,7 +118,7 @@ export default function PrivacyPage() {
           <H3>5.2 How Voice Data Is Used</H3>
           <p>
             Voice data is used exclusively for creating a synthetic voice clone and narrating stories
-            within Mello. It is not used for identification, advertising, sale to third parties, or
+            within Melo. It is not used for identification, advertising, sale to third parties, or
             training general-purpose AI models.
           </p>
 
@@ -190,7 +190,7 @@ export default function PrivacyPage() {
 
         <Section title="9. International Data Transfers">
           <p>
-            Mello is operated from the United States. If you access the Service from outside the
+            Melo is operated from the United States. If you access the Service from outside the
             US, your information will be transferred to and processed in the United States. By using
             the Service, you consent to this transfer.
           </p>
@@ -212,7 +212,7 @@ export default function PrivacyPage() {
             </a>
           </p>
           <p>
-            <strong className="text-on-surface">Mello</strong><br />
+            <strong className="text-on-surface">Melo</strong><br />
             Website: melostories.com
           </p>
         </Section>

@@ -14,14 +14,12 @@
  * instead of waiting for auth → API → images.
  */
 
-import { useEffect, useState, useCallback, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { useAuthContext } from '@/context/auth-context'
 import { useApiClient } from '@/hooks/useApiClient'
 import { BottomNav } from '@/components/bottom-nav'
-import { SearchOverlay } from '@/components/search-overlay'
-import { Icon } from '@/components/icon'
 import { TermsGate } from '@/components/terms-gate'
 import { CURRENT_TERMS_VERSION } from '@mello/types'
 import type { UserProfile, ApiResponse } from '@mello/types'
@@ -34,9 +32,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const [termsAccepted, setTermsAccepted] = useState(false)
 
   const isPlayer = pathname.startsWith('/player')
-  const [searchOpen, setSearchOpen] = useState(false)
-  const openSearch = useCallback(() => setSearchOpen(true), [])
-  const closeSearch = useCallback(() => setSearchOpen(false), [])
 
   const { data: profileResponse, isLoading: profileLoading } = useQuery({
     queryKey: ['me'],
@@ -70,21 +65,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      {/* Search button — top-right on all pages except player */}
-      {!isPlayer && !loading && user && (
-        <button
-          onClick={openSearch}
-          className="fixed right-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-high/40 transition-all hover:bg-surface-container-highest/60"
-          aria-label="Search stories"
-        >
-          <Icon name="search" size={22} className="text-on-surface-variant" />
-        </button>
-      )}
       <main className={`flex-1 ${isPlayer ? '' : 'pb-20'}`}>
         {children}
       </main>
       {!loading && user && <BottomNav />}
-      <SearchOverlay open={searchOpen} onClose={closeSearch} />
     </div>
   )
 }

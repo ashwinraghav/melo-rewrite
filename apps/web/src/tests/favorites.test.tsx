@@ -31,23 +31,19 @@ vi.mock('@/context/auth-context', () => ({
   }),
 }))
 
+const mockGet = vi.fn()
 const mockGetList = vi.fn()
 const mockPost = vi.fn()
 const mockDelete = vi.fn()
 
 vi.mock('@/hooks/useApiClient', () => ({
   useApiClient: () => ({
-    get: vi.fn(),
+    get: mockGet,
     getList: mockGetList,
     post: mockPost,
     patch: vi.fn(),
     delete: mockDelete,
   }),
-}))
-
-const mockFetchStoryDetail = vi.fn()
-vi.mock('@/lib/cdn', () => ({
-  fetchStoryDetail: (...args: unknown[]) => mockFetchStoryDetail(...args),
 }))
 
 vi.mock('@/lib/analytics', () => ({
@@ -143,9 +139,9 @@ describe('FavoritesContent', () => {
 
   it('renders favorite cards with story titles when favorites exist', async () => {
     mockGetList.mockResolvedValue(MOCK_FAVORITES)
-    mockFetchStoryDetail.mockImplementation((storyId: string) => {
-      if (storyId === 'story-1') return Promise.resolve(MOCK_STORY_1)
-      if (storyId === 'story-2') return Promise.resolve(MOCK_STORY_2)
+    mockGet.mockImplementation((path: string) => {
+      if (path === '/v1/stories/story-1') return Promise.resolve(MOCK_STORY_1)
+      if (path === '/v1/stories/story-2') return Promise.resolve(MOCK_STORY_2)
       return Promise.reject(new Error('not found'))
     })
 
@@ -163,7 +159,7 @@ describe('FavoritesContent', () => {
       total: 1,
       hasMore: false,
     })
-    mockFetchStoryDetail.mockRejectedValue(new Error('CDN 404'))
+    mockGet.mockRejectedValue(new Error('API 404'))
 
     renderWithQuery(<FavoritesContent />)
 
@@ -174,9 +170,9 @@ describe('FavoritesContent', () => {
 
   it('play button navigates to player page', async () => {
     mockGetList.mockResolvedValue(MOCK_FAVORITES)
-    mockFetchStoryDetail.mockImplementation((storyId: string) => {
-      if (storyId === 'story-1') return Promise.resolve(MOCK_STORY_1)
-      if (storyId === 'story-2') return Promise.resolve(MOCK_STORY_2)
+    mockGet.mockImplementation((path: string) => {
+      if (path === '/v1/stories/story-1') return Promise.resolve(MOCK_STORY_1)
+      if (path === '/v1/stories/story-2') return Promise.resolve(MOCK_STORY_2)
       return Promise.reject(new Error('not found'))
     })
 
@@ -193,9 +189,9 @@ describe('FavoritesContent', () => {
 
   it('clicking favorite heart removes the favorite', async () => {
     mockGetList.mockResolvedValue(MOCK_FAVORITES)
-    mockFetchStoryDetail.mockImplementation((storyId: string) => {
-      if (storyId === 'story-1') return Promise.resolve(MOCK_STORY_1)
-      if (storyId === 'story-2') return Promise.resolve(MOCK_STORY_2)
+    mockGet.mockImplementation((path: string) => {
+      if (path === '/v1/stories/story-1') return Promise.resolve(MOCK_STORY_1)
+      if (path === '/v1/stories/story-2') return Promise.resolve(MOCK_STORY_2)
       return Promise.reject(new Error('not found'))
     })
     mockDelete.mockResolvedValue({})

@@ -73,7 +73,7 @@ export default function SignInPage() {
       >
         {/* Logo — full wordmark as the hero brand moment */}
         <div className="mb-4 flex justify-center">
-          <img src="/logo.png" alt="Mello" className="h-20 w-auto opacity-90" />
+          <img src="/logo.png" alt="Melo" className="h-20 w-auto opacity-90" />
         </div>
 
         <div className="mb-10" />

@@ -29,23 +29,19 @@ vi.mock('@/context/auth-context', () => ({
   }),
 }))
 
+const mockGet = vi.fn()
 const mockGetList = vi.fn()
 const mockPost = vi.fn()
 const mockDelete = vi.fn()
 
 vi.mock('@/hooks/useApiClient', () => ({
   useApiClient: () => ({
-    get: vi.fn(),
+    get: mockGet,
     getList: mockGetList,
     post: mockPost,
     patch: vi.fn(),
     delete: mockDelete,
   }),
-}))
-
-const mockFetchStoryDetail = vi.fn()
-vi.mock('@/lib/cdn', () => ({
-  fetchStoryDetail: (...args: unknown[]) => mockFetchStoryDetail(...args),
 }))
 
 vi.mock('@/lib/analytics', () => ({
@@ -135,9 +131,9 @@ describe('HistoryContent', () => {
 
   it('renders history entries with story titles from CDN', async () => {
     mockGetList.mockResolvedValue(MOCK_HISTORY)
-    mockFetchStoryDetail.mockImplementation((storyId: string) => {
-      if (storyId === 'story-1') return Promise.resolve(MOCK_STORY_1)
-      if (storyId === 'story-2') return Promise.resolve(MOCK_STORY_2)
+    mockGet.mockImplementation((path: string) => {
+      if (path === '/v1/stories/story-1') return Promise.resolve(MOCK_STORY_1)
+      if (path === '/v1/stories/story-2') return Promise.resolve(MOCK_STORY_2)
       return Promise.reject(new Error('not found'))
     })
 
@@ -155,7 +151,7 @@ describe('HistoryContent', () => {
       total: 1,
       hasMore: false,
     })
-    mockFetchStoryDetail.mockRejectedValue(new Error('CDN 404'))
+    mockGet.mockRejectedValue(new Error('API 404'))
 
     renderWithQuery(<HistoryContent />)
 
@@ -166,9 +162,9 @@ describe('HistoryContent', () => {
 
   it('shows "Finished" for completed stories', async () => {
     mockGetList.mockResolvedValue(MOCK_HISTORY)
-    mockFetchStoryDetail.mockImplementation((storyId: string) => {
-      if (storyId === 'story-1') return Promise.resolve(MOCK_STORY_1)
-      if (storyId === 'story-2') return Promise.resolve(MOCK_STORY_2)
+    mockGet.mockImplementation((path: string) => {
+      if (path === '/v1/stories/story-1') return Promise.resolve(MOCK_STORY_1)
+      if (path === '/v1/stories/story-2') return Promise.resolve(MOCK_STORY_2)
       return Promise.reject(new Error('not found'))
     })
 
@@ -181,9 +177,9 @@ describe('HistoryContent', () => {
 
   it('shows progress time for in-progress stories', async () => {
     mockGetList.mockResolvedValue(MOCK_HISTORY)
-    mockFetchStoryDetail.mockImplementation((storyId: string) => {
-      if (storyId === 'story-1') return Promise.resolve(MOCK_STORY_1)
-      if (storyId === 'story-2') return Promise.resolve(MOCK_STORY_2)
+    mockGet.mockImplementation((path: string) => {
+      if (path === '/v1/stories/story-1') return Promise.resolve(MOCK_STORY_1)
+      if (path === '/v1/stories/story-2') return Promise.resolve(MOCK_STORY_2)
       return Promise.reject(new Error('not found'))
     })
 
@@ -197,7 +193,7 @@ describe('HistoryContent', () => {
 
   it('shows "Recently Read" section label when entries exist', async () => {
     mockGetList.mockResolvedValue(MOCK_HISTORY)
-    mockFetchStoryDetail.mockImplementation(() => Promise.resolve(MOCK_STORY_1))
+    mockGet.mockResolvedValue(MOCK_STORY_1)
 
     renderWithQuery(<HistoryContent />)
 
@@ -208,9 +204,9 @@ describe('HistoryContent', () => {
 
   it('clicking a history entry navigates to player', async () => {
     mockGetList.mockResolvedValue(MOCK_HISTORY)
-    mockFetchStoryDetail.mockImplementation((storyId: string) => {
-      if (storyId === 'story-1') return Promise.resolve(MOCK_STORY_1)
-      if (storyId === 'story-2') return Promise.resolve(MOCK_STORY_2)
+    mockGet.mockImplementation((path: string) => {
+      if (path === '/v1/stories/story-1') return Promise.resolve(MOCK_STORY_1)
+      if (path === '/v1/stories/story-2') return Promise.resolve(MOCK_STORY_2)
       return Promise.reject(new Error('not found'))
     })
 
@@ -226,8 +222,8 @@ describe('HistoryContent', () => {
 
   it('tracks story selection analytics on click', async () => {
     mockGetList.mockResolvedValue(MOCK_HISTORY)
-    mockFetchStoryDetail.mockImplementation((storyId: string) => {
-      if (storyId === 'story-1') return Promise.resolve(MOCK_STORY_1)
+    mockGet.mockImplementation((path: string) => {
+      if (path === '/v1/stories/story-1') return Promise.resolve(MOCK_STORY_1)
       return Promise.reject(new Error('not found'))
     })
 

@@ -2,7 +2,7 @@
 
 /**
  * History page.
- * Hydrates each history entry with story details from the CDN catalog,
+ * Hydrates each history entry with story details from the API,
  * consistent with the favorites page approach.
  */
 
@@ -10,7 +10,6 @@ import { useQuery, useQueries } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { useApiClient } from '@/hooks/useApiClient'
-import { fetchStoryDetail } from '@/lib/cdn'
 import { FavoriteButton } from '@/components/favorite-button'
 import { Icon } from '@/components/icon'
 import { trackStorySelected } from '@/lib/analytics'
@@ -40,11 +39,11 @@ export function HistoryContent() {
 
   const entries = (data as PaginatedResponse<HistoryEntry> | undefined)?.data ?? []
 
-  // Hydrate each history entry with story details from CDN
+  // Hydrate each history entry with story details from API
   const storyQueries = useQueries({
     queries: entries.map((entry) => ({
       queryKey: ['story', entry.storyId],
-      queryFn: () => fetchStoryDetail<StoryWithAudioUrl>(entry.storyId),
+      queryFn: () => client.get<StoryWithAudioUrl>(`/v1/stories/${entry.storyId}`),
       enabled: entries.length > 0,
       staleTime: 5 * 60 * 1000,
     })),

@@ -1,8 +1,8 @@
 /**
  * Search page tests.
  *
- * Tests the semantic search UI: input, results rendering, empty/no-results
- * states, navigation, and the "Shar" badge for user-generated stories.
+ * Tests the semantic search UI: conversational input, suggestion chips,
+ * results rendering, empty/no-results states, and navigation.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -102,10 +102,10 @@ describe('SearchPage', () => {
 
   // ── Empty state ─────────────────────────────────────────────────────
 
-  it('renders empty state before first search', () => {
+  it('renders empty state with conversational heading', () => {
     renderWithQuery(<SearchPageWrapper />)
-    expect(screen.getByText('Find a Story')).toBeInTheDocument()
-    expect(screen.getByText(/try describing a situation/i)).toBeInTheDocument()
+    expect(screen.getByText(/what's your child going through/i)).toBeInTheDocument()
+    expect(screen.getByText(/try something like/i)).toBeInTheDocument()
   })
 
   it('renders search textarea with placeholder', () => {
@@ -113,23 +113,28 @@ describe('SearchPage', () => {
     expect(screen.getByPlaceholderText(/my child is jealous/i)).toBeInTheDocument()
   })
 
-  // ── Search input ────────────────────────────────────────────────────
-
-  it('disables Search button when input is empty', () => {
+  it('shows suggestion chips before first search', () => {
     renderWithQuery(<SearchPageWrapper />)
-    const button = screen.getByRole('button', { name: /^search$/i })
-    expect(button).toBeDisabled()
+    expect(screen.getByText('afraid of the dark')).toBeInTheDocument()
+    expect(screen.getByText('bedtime anxiety')).toBeInTheDocument()
+    expect(screen.getByText('first day of school')).toBeInTheDocument()
   })
 
-  it('enables Search button when input has text', () => {
+  // ── Search input ────────────────────────────────────────────────────
+
+  it('does not show send button when input is empty', () => {
+    renderWithQuery(<SearchPageWrapper />)
+    expect(screen.queryByRole('button', { name: /^search$/i })).not.toBeInTheDocument()
+  })
+
+  it('shows send button when input has text', () => {
     renderWithQuery(<SearchPageWrapper />)
     const textarea = screen.getByPlaceholderText(/my child is jealous/i)
     fireEvent.change(textarea, { target: { value: 'bedtime stories' } })
-    const button = screen.getByRole('button', { name: /^search$/i })
-    expect(button).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: /^search$/i })).toBeInTheDocument()
   })
 
-  it('calls router.replace with query on Search click', () => {
+  it('calls router.replace with query on send click', () => {
     renderWithQuery(<SearchPageWrapper />)
     const textarea = screen.getByPlaceholderText(/my child is jealous/i)
     fireEvent.change(textarea, { target: { value: 'bedtime' } })
@@ -153,12 +158,19 @@ describe('SearchPage', () => {
     expect(mockReplace).not.toHaveBeenCalled()
   })
 
-  it('does not search with whitespace-only input', () => {
+  it('does not show send button with whitespace-only input', () => {
     renderWithQuery(<SearchPageWrapper />)
     const textarea = screen.getByPlaceholderText(/my child is jealous/i)
     fireEvent.change(textarea, { target: { value: '   ' } })
-    const button = screen.getByRole('button', { name: /^search$/i })
-    expect(button).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /^search$/i })).not.toBeInTheDocument()
+  })
+
+  // ── Suggestion chips ──────────────────────────────────────────────
+
+  it('searches when a suggestion chip is clicked', () => {
+    renderWithQuery(<SearchPageWrapper />)
+    fireEvent.click(screen.getByText('afraid of the dark'))
+    expect(mockReplace).toHaveBeenCalledWith('/search?q=afraid%20of%20the%20dark')
   })
 
   // ── Results rendering ───────────────────────────────────────────────
@@ -170,7 +182,7 @@ describe('SearchPage', () => {
     renderWithQuery(<SearchPageWrapper />)
 
     await waitFor(() => {
-      expect(screen.getByText('2 Stories Found')).toBeInTheDocument()
+      expect(screen.getByText('2 stories')).toBeInTheDocument()
     })
     expect(screen.getByText('Bedtime Bunnies')).toBeInTheDocument()
     expect(screen.getByText('My Custom Tale')).toBeInTheDocument()
@@ -188,17 +200,16 @@ describe('SearchPage', () => {
     })
   })
 
-  it('shows "Shar" badge for user-generated stories', async () => {
+  it('shows "Yours" badge for user-generated stories', async () => {
     mockSearchParams = new URLSearchParams('q=bedtime')
     mockPost.mockResolvedValueOnce(MOCK_RESULTS)
 
     renderWithQuery(<SearchPageWrapper />)
 
     await waitFor(() => {
-      expect(screen.getByText('Shar')).toBeInTheDocument()
+      expect(screen.getByText('Yours')).toBeInTheDocument()
     })
-    // Only one "Shar" badge (story-2 has source='user', story-1 has source='curated')
-    expect(screen.getAllByText('Shar')).toHaveLength(1)
+    expect(screen.getAllByText('Yours')).toHaveLength(1)
   })
 
   it('shows cover art image when URL is present', async () => {
@@ -208,7 +219,6 @@ describe('SearchPage', () => {
     renderWithQuery(<SearchPageWrapper />)
 
     await waitFor(() => {
-      // img with alt="" has no accessible role; query by tag instead
       const images = document.querySelectorAll('img[src*="cover1.webp"]')
       expect(images.length).toBe(1)
     })
@@ -264,7 +274,6 @@ describe('SearchPage', () => {
     renderWithQuery(<SearchPageWrapper />)
 
     await waitFor(() => {
-      expect(screen.getByText('No Stories Found')).toBeInTheDocument()
       expect(screen.getByText(/no stories matched/i)).toBeInTheDocument()
     })
   })
@@ -276,40 +285,41 @@ describe('SearchPage', () => {
     renderWithQuery(<SearchPageWrapper />)
 
     await waitFor(() => {
-      expect(screen.getByText('No Stories Found')).toBeInTheDocument()
+      expect(screen.getByText(/no stories matched/i)).toBeInTheDocument()
     })
     expect(screen.queryByText(/play all/i)).not.toBeInTheDocument()
   })
 
-  // ── Clear button ────────────────────────────────────────────────────
+  // ── Active query pill ─────────────────────────────────────────────
 
-  it('shows Clear button when query is active', async () => {
+  it('shows active query pill when query is active', async () => {
     mockSearchParams = new URLSearchParams('q=bedtime')
     mockPost.mockResolvedValueOnce(MOCK_RESULTS)
 
     renderWithQuery(<SearchPageWrapper />)
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /clear/i })).toBeInTheDocument()
+      expect(screen.getByText(/showing results for/i)).toBeInTheDocument()
+      expect(screen.getByText(/\u201cbedtime\u201d/)).toBeInTheDocument()
     })
   })
 
-  it('does not show Clear button when no query', () => {
+  it('does not show query pill when no query', () => {
     renderWithQuery(<SearchPageWrapper />)
-    expect(screen.queryByRole('button', { name: /clear/i })).not.toBeInTheDocument()
+    expect(screen.queryByText(/showing results for/i)).not.toBeInTheDocument()
   })
 
-  it('navigates to /search on Clear click', async () => {
+  it('navigates to /search when query pill is dismissed', async () => {
     mockSearchParams = new URLSearchParams('q=bedtime')
     mockPost.mockResolvedValueOnce(MOCK_RESULTS)
 
     renderWithQuery(<SearchPageWrapper />)
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /clear/i })).toBeInTheDocument()
+      expect(screen.getByText(/\u201cbedtime\u201d/)).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: /clear/i }))
+    fireEvent.click(screen.getByText(/\u201cbedtime\u201d/))
     expect(mockReplace).toHaveBeenCalledWith('/search')
   })
 })

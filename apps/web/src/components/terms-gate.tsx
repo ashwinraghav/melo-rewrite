@@ -39,7 +39,7 @@ export function TermsGate({ onAccepted }: { onAccepted: () => void }) {
         </h1>
         <p className="mb-6 font-body text-sm text-on-surface-variant">
           We&apos;ve updated our Terms of Service and Privacy Policy. Please review and accept to
-          continue using Mello.
+          continue using Melo.
         </p>
 
         <div className="mb-6 flex gap-4">

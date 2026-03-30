@@ -3,7 +3,7 @@
 /**
  * Favorites page.
  * Fetches favorite IDs from the API, then hydrates each with
- * story details from the CDN catalog.
+ * story details from the API.
  */
 
 import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query'
@@ -11,7 +11,6 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { useApiClient } from '@/hooks/useApiClient'
 import { useFavorites } from '@/hooks/useFavorites'
-import { fetchStoryDetail } from '@/lib/cdn'
 import { Icon } from '@/components/icon'
 import { FavoriteButton } from '@/components/favorite-button'
 import { trackStorySelected } from '@/lib/analytics'
@@ -34,11 +33,11 @@ export function FavoritesContent() {
 
   const favorites = (data as PaginatedResponse<Favorite> | undefined)?.data ?? []
 
-  // Hydrate each favorite with story details from CDN
+  // Hydrate each favorite with story details from API
   const storyQueries = useQueries({
     queries: favorites.map((fav) => ({
       queryKey: ['story', fav.storyId],
-      queryFn: () => fetchStoryDetail<StoryWithAudioUrl>(fav.storyId),
+      queryFn: () => client.get<StoryWithAudioUrl>(`/v1/stories/${fav.storyId}`),
       enabled: favorites.length > 0,
       staleTime: 5 * 60 * 1000,
     })),

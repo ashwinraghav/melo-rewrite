@@ -13,7 +13,6 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useApiClient } from '@/hooks/useApiClient'
-import { fetchStoryDetail, fetchStoryList } from '@/lib/cdn'
 import { AudioPlayer } from '@/components/audio-player'
 import { ReadAlong } from '@/components/read-along'
 import { PersonalizeSheet } from '@/components/personalize-sheet'
@@ -64,20 +63,20 @@ export function PlayerContent() {
     [currentId],
   )
 
-  // Fetch from static CDN catalog — no auth needed, no API server hit
   const { data, isLoading, isError } = useQuery({
     queryKey: ['story', currentId],
-    queryFn: () => fetchStoryDetail<StoryWithAudioUrl>(currentId),
+    queryFn: () => client.get<StoryWithAudioUrl>(`/v1/stories/${currentId}`),
     enabled: !!currentId,
+    staleTime: 60_000,
   })
 
   const story = data?.data
 
-  // Fetch playlist from CDN
   const { data: playlistData } = useQuery({
     queryKey: ['stories', topics],
-    queryFn: () => fetchStoryList<StoryWithAudioUrl>(topics || undefined),
+    queryFn: () => client.getList<StoryWithAudioUrl>(topics ? `/v1/stories?topics=${topics}` : '/v1/stories'),
     enabled: !!topics,
+    staleTime: 60_000,
   })
 
   const playlist = (playlistData as PaginatedResponse<StoryWithAudioUrl> | undefined)?.data ?? []
@@ -89,21 +88,23 @@ export function PlayerContent() {
   const prevStory = currentIndex > 0 ? playlist[currentIndex - 1] : null
   const nextStory = currentIndex >= 0 && currentIndex < playlist.length - 1 ? playlist[currentIndex + 1] : null
 
-  // Pre-fetch adjacent stories from CDN so transitions are instant
+  // Pre-fetch adjacent stories so transitions are instant
   useEffect(() => {
     if (nextStory) {
       queryClient.prefetchQuery({
         queryKey: ['story', nextStory.id],
-        queryFn: () => fetchStoryDetail<StoryWithAudioUrl>(nextStory.id),
+        queryFn: () => client.get<StoryWithAudioUrl>(`/v1/stories/${nextStory.id}`),
+        staleTime: 60_000,
       })
     }
     if (prevStory) {
       queryClient.prefetchQuery({
         queryKey: ['story', prevStory.id],
-        queryFn: () => fetchStoryDetail<StoryWithAudioUrl>(prevStory.id),
+        queryFn: () => client.get<StoryWithAudioUrl>(`/v1/stories/${prevStory.id}`),
+        staleTime: 60_000,
       })
     }
-  }, [nextStory?.id, prevStory?.id, queryClient])
+  }, [nextStory?.id, prevStory?.id, queryClient, client])
 
   // Keep URL in sync for deep-linking without triggering re-render
   useEffect(() => {

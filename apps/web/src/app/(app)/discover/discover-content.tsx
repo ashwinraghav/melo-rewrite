@@ -27,11 +27,8 @@ export function DiscoverContent() {
     <div className="px-6 py-8 pb-28">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-        <div className="mb-1 flex items-center gap-2.5">
-          <img src="/icon-v2.png" alt="" className="h-11 w-11" />
-          <span className="font-display text-xl font-bold tracking-tight text-on-surface">
-            Mello
-          </span>
+        <div className="mb-1">
+          <img src="/logo.png" alt="Melo" className="h-11 w-auto" />
         </div>
 
         <h2 className="mt-6 font-display text-xl font-semibold text-on-surface">
