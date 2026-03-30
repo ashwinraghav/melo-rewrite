@@ -21,3 +21,6 @@ export async function register() {
     })
   }
 }
+
+// Capture errors from nested React server components (Next.js 15+)
+export { captureRequestError as onRequestError } from '@sentry/nextjs'
