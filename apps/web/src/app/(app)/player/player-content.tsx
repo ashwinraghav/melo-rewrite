@@ -18,6 +18,7 @@ import { AudioPlayer } from '@/components/audio-player'
 import { ReadAlong } from '@/components/read-along'
 import { PersonalizeSheet } from '@/components/personalize-sheet'
 import { Icon } from '@/components/icon'
+import { FavoriteButton } from '@/components/favorite-button'
 import { cn } from '@/lib/cn'
 import {
   trackStoryPlay, trackStoryPause, trackStoryComplete, trackStoryProgress,
@@ -274,14 +275,17 @@ export function PlayerContent() {
             <p className="mt-1 text-sm text-on-surface-variant">{story.description}</p>
           </div>
 
-          {/* Personalize button */}
-          <button
-            onClick={() => { trackPersonalizeOpened(currentId); setShowPersonalize(true) }}
-            className="mt-3 flex items-center gap-1.5 rounded-full bg-surface-container-high/60 px-3 py-1.5 font-body text-xs text-on-surface-variant transition-all hover:bg-surface-container-highest/60"
-          >
-            <Icon name="record_voice_over" size={14} />
-            {voiceOverride ? `Narrated by ${voiceOverride.voiceName}` : 'Personalize voice'}
-          </button>
+          {/* Personalize + Favorite */}
+          <div className="mt-3 flex items-center gap-3">
+            <button
+              onClick={() => { trackPersonalizeOpened(currentId); setShowPersonalize(true) }}
+              className="flex items-center gap-1.5 rounded-full bg-surface-container-high/60 px-3 py-1.5 font-body text-xs text-on-surface-variant transition-all hover:bg-surface-container-highest/60"
+            >
+              <Icon name="record_voice_over" size={14} />
+              {voiceOverride ? `Narrated by ${voiceOverride.voiceName}` : 'Personalize voice'}
+            </button>
+            <FavoriteButton storyId={currentId} />
+          </div>
         </motion.div>
       </AnimatePresence>
 

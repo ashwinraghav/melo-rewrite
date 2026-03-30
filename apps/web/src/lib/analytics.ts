@@ -201,3 +201,15 @@ export function trackFavoriteAdd(storyId: string) {
 export function trackFavoriteRemove(storyId: string) {
   gtag("event", "favorite_remove", { story_id: storyId });
 }
+
+// ── Web Vitals ─────────────────────────────────────────────────────────────
+
+export function trackWebVital(name: string, value: number, rating: string, id: string) {
+  gtag("event", name, {
+    event_category: "Web Vitals",
+    value: Math.round(value),
+    metric_id: id,
+    metric_rating: rating,
+    non_interaction: true,
+  });
+}

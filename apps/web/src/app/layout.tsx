@@ -6,6 +6,7 @@ import { Suspense } from 'react'
 import { AuthProvider } from '@/context/auth-context'
 import { QueryProvider } from '@/context/query-provider'
 import { AnalyticsPageView } from '@/components/analytics-page-view'
+import { WebVitalsReporter } from '@/components/web-vitals-reporter'
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
 
@@ -22,13 +23,13 @@ const lexend = Lexend({
 })
 
 export const metadata: Metadata = {
-  title: 'Mello — Bedtime Stories',
-  description: 'Calm, lo-fi audio stories for children at wind-down time.',
+  title: 'Melo — Audio Stories for Children',
+  description: 'Gentle, calming audio stories that help children explore emotions, friendships, and the world around them.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Mello',
+    title: 'Melo',
   },
 }
 
@@ -75,6 +76,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Suspense fallback={null}>
           <AnalyticsPageView />
         </Suspense>
+        {GA_ID && <WebVitalsReporter />}
         <QueryProvider>
           <AuthProvider>{children}</AuthProvider>
         </QueryProvider>
