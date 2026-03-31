@@ -15,7 +15,7 @@ env:
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
     value: AIzaSyCBH3p0XEB1OuYl03YX8W9f8jbU-jhrwVg
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: melostories.com
+    value: melo-f5756.firebaseapp.com
   - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
     value: melo-f5756
   - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET

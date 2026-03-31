@@ -18,6 +18,7 @@ resource "google_identity_platform_config" "auth" {
     "www.melobooks.com",
     "melostories.com",
     "www.melostories.com",
+    "melo-backend--${var.project_id}.us-central1.hosted.app",
   ]
 
   depends_on = [google_project_service.apis]
