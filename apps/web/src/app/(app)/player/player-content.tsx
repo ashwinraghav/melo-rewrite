@@ -355,6 +355,7 @@ export function PlayerContent() {
             }
           }}
           onEnded={handleEnded}
+          onError={voiceOverride ? () => setVoiceOverride(null) : undefined}
         />
       </div>
 

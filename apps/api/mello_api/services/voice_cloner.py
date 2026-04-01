@@ -5,12 +5,18 @@ ABC interface + production (ElevenLabs) and test (mock) implementations.
 """
 from __future__ import annotations
 
+import asyncio
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from datetime import timedelta
 
+import google.auth
 import httpx
 from gcloud.aio.storage import Storage
+from google.auth.transport.requests import Request as GoogleAuthRequest
+from google.cloud import storage as gcs_sync
+from google.oauth2.service_account import Credentials as SACredentials
 from opentelemetry import trace
 
 from ..metrics import (
@@ -53,6 +59,18 @@ class ElevenLabsVoiceCloner(VoiceClonerService):
             timeout=60,
         )
         self._storage = Storage()
+        # Signed URL support — same pattern as FirestoreStoryRepository
+        self._gcs_client = gcs_sync.Client()
+        self._url_ttl_seconds = 900  # 15 minutes
+        credentials, _ = google.auth.default()
+        self._credentials = credentials
+        self._sa_email: str | None = None
+        if not isinstance(credentials, SACredentials):
+            try:
+                credentials.refresh(GoogleAuthRequest())
+                self._sa_email = credentials.service_account_email
+            except (AttributeError, Exception):
+                pass  # Local dev ADC — signed URLs won't work
 
     async def clone_voice(self, name: str, audio_bytes: bytes) -> CloneResult:
         with tracer.start_as_current_span(
@@ -178,8 +196,25 @@ class ElevenLabsVoiceCloner(VoiceClonerService):
                 span.set_status(trace.StatusCode.ERROR, str(e))
                 raise
 
+    def _signed_url_sync(self, path: str) -> str:
+        """Synchronous signed URL generation — called via asyncio.to_thread."""
+        blob = self._gcs_client.bucket(self._firebase_bucket).blob(path)
+        expiration = timedelta(seconds=self._url_ttl_seconds)
+        if isinstance(self._credentials, SACredentials):
+            return blob.generate_signed_url(version="v4", expiration=expiration, method="GET")
+        else:
+            if not self._credentials.token or not self._credentials.valid:
+                self._credentials.refresh(GoogleAuthRequest())
+            return blob.generate_signed_url(
+                version="v4",
+                expiration=expiration,
+                method="GET",
+                service_account_email=self._sa_email,
+                access_token=self._credentials.token,
+            )
+
     async def get_download_url(self, path: str) -> str:
-        return f"https://storage.googleapis.com/{self._firebase_bucket}/{path}"
+        return await asyncio.to_thread(self._signed_url_sync, path)
 
 
 class MockVoiceCloner(VoiceClonerService):

@@ -122,7 +122,7 @@ export function VoiceSwitcher({
             onClick={() => {
               if (isReady && conv?.audioUrl) {
                 onVoiceChange(voice.id, conv.audioUrl, conv.segments)
-              } else if (hasNoConversion) {
+              } else if (hasNoConversion || isFailed) {
                 handleConvert(voice.id)
               }
             }}

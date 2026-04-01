@@ -2,12 +2,13 @@
 Voice feature tests — invites, recording, voice management, and story conversion.
 """
 import asyncio
+from dataclasses import dataclass
 import pytest
 import httpx
 from httpx import ASGITransport
 from fastapi.testclient import TestClient
 from mello_api.main import create_app
-from mello_api.repositories.interfaces import Services
+from mello_api.repositories.interfaces import Repositories, Services
 from mello_api.repositories.memory import create_memory_repositories, MemoryStoryRepository
 from mello_api.services.story_generator import MockStoryGenerator
 from mello_api.services.audio_publisher import MockAudioPublisher
@@ -26,8 +27,14 @@ async def _noop_handler(task_type: str, payload: dict) -> None:
     pass
 
 
+@dataclass
+class VoiceEnv:
+    client: TestClient
+    repos: Repositories
+
+
 @pytest.fixture
-def voice_client():
+def voice_env():
     repos = create_memory_repositories()
     assert isinstance(repos.stories, MemoryStoryRepository)
     repos.stories.seed(STORIES)
@@ -60,7 +67,12 @@ def voice_client():
 
     services.task_queue._handler = _dispatch
 
-    return TestClient(app)
+    return VoiceEnv(client=TestClient(app), repos=repos)
+
+
+@pytest.fixture
+def voice_client(voice_env):
+    return voice_env.client
 
 
 FAKE_AUDIO = b"\x00" * 100_000  # 100KB — well over the 50KB minimum
@@ -390,3 +402,75 @@ def test_list_conversions_for_story(voice_client):
     assert data[0]["voiceName"] == "Grandma"
     assert data[0]["status"] == "ready"
     assert "audioUrl" in data[0]
+
+
+def test_convert_failed_allows_retry(voice_env):
+    """A failed conversion can be retried — the /convert endpoint accepts re-conversion."""
+    client = voice_env.client
+    voice_id = _create_voice(client)
+    r = client.get("/v1/stories", headers=auth("user-1"))
+    story_id = r.json()["data"][0]["id"]
+
+    # First conversion succeeds
+    r = client.post(
+        "/v1/voices/convert",
+        json={"storyId": story_id, "voiceId": voice_id},
+        headers=auth("user-1"),
+    )
+    assert r.status_code == 202
+
+    # Confirm it's ready (blocks duplicate)
+    r = client.post(
+        "/v1/voices/convert",
+        json={"storyId": story_id, "voiceId": voice_id},
+        headers=auth("user-1"),
+    )
+    assert r.status_code == 400
+
+    # Simulate failure by updating conversion status directly
+    asyncio.run(voice_env.repos.conversions.update(
+        "user-1", story_id, voice_id, {"status": "failed"}
+    ))
+
+    # Verify it shows as failed in the listing
+    r = client.get(f"/v1/voices/conversions/{story_id}", headers=auth("user-1"))
+    assert r.json()["data"][0]["status"] == "failed"
+    assert "audioUrl" not in r.json()["data"][0]
+
+    # Retry should be accepted
+    r = client.post(
+        "/v1/voices/convert",
+        json={"storyId": story_id, "voiceId": voice_id},
+        headers=auth("user-1"),
+    )
+    assert r.status_code == 202
+
+    # Should be ready again after the task completes
+    r = client.get(f"/v1/voices/conversions/{story_id}", headers=auth("user-1"))
+    assert r.json()["data"][0]["status"] == "ready"
+    assert "audioUrl" in r.json()["data"][0]
+
+
+def test_list_conversions_no_audio_url_when_failed(voice_env):
+    """Failed conversions should not include an audioUrl."""
+    client = voice_env.client
+    voice_id = _create_voice(client)
+    r = client.get("/v1/stories", headers=auth("user-1"))
+    story_id = r.json()["data"][0]["id"]
+
+    # Create and complete a conversion
+    client.post(
+        "/v1/voices/convert",
+        json={"storyId": story_id, "voiceId": voice_id},
+        headers=auth("user-1"),
+    )
+
+    # Simulate failure
+    asyncio.run(voice_env.repos.conversions.update(
+        "user-1", story_id, voice_id, {"status": "failed"}
+    ))
+
+    r = client.get(f"/v1/voices/conversions/{story_id}", headers=auth("user-1"))
+    conv = r.json()["data"][0]
+    assert conv["status"] == "failed"
+    assert "audioUrl" not in conv

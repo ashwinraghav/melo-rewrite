@@ -81,11 +81,15 @@ export function PersonalizeSheet({
     enabled: !!user && open,
   })
 
-  // Fetch conversions for this story
+  // Fetch conversions for this story — poll every 2s while any are processing
   const { data: conversionsData } = useQuery({
     queryKey: ['conversions', storyId],
     queryFn: () => client.getList<StoryConversion>(`/v1/voices/conversions/${storyId}`),
     enabled: !!user && open,
+    refetchInterval: (query) => {
+      const convs = (query.state.data as PaginatedResponse<StoryConversion> | undefined)?.data ?? []
+      return convs.some((c) => c.status === 'processing') ? 2000 : false
+    },
   })
 
   const voices = (voicesData as PaginatedResponse<Voice> | undefined)?.data ?? []
@@ -165,6 +169,7 @@ export function PersonalizeSheet({
             const isActive = activeVoiceId === voice.id
             const isReady = conv?.status === 'ready'
             const isProcessing = conv?.status === 'processing' || (isConverting && convertingVoiceId === voice.id)
+            const isFailed = conv?.status === 'failed'
             const hasNoConversion = !conv && !(isConverting && convertingVoiceId === voice.id)
 
             return (
@@ -175,7 +180,7 @@ export function PersonalizeSheet({
                     onVoiceChange(voice.id, voice.name, conv.audioUrl, conv.segments)
                   }
                 }}
-                disabled={!isReady && !hasNoConversion}
+                disabled={!isReady && !hasNoConversion && !isFailed}
                 className={`mb-2 flex w-full items-center gap-4 rounded-[1rem] p-3 transition-all duration-200 ${
                   isActive
                     ? 'bg-primary/10'
@@ -215,8 +220,16 @@ export function PersonalizeSheet({
                     Convert
                   </button>
                 )}
-                {conv?.status === 'failed' && (
-                  <span className="font-body text-xs text-error">Failed</span>
+                {isFailed && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleConvert(voice.id)
+                    }}
+                    className="flex items-center gap-1 rounded-full bg-error/15 px-3 py-1.5 font-body text-xs font-medium text-error transition-all hover:bg-error/25"
+                  >
+                    Retry
+                  </button>
                 )}
               </button>
             )

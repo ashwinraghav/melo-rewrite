@@ -7,7 +7,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REGISTRY="us-central1-docker.pkg.dev/melo-f5756/mello"
-TAG="$(git rev-parse --short HEAD)"
+GIT_SHA="$(git rev-parse --short HEAD)"
+DIRTY_SUFFIX=""
+if ! git diff --quiet HEAD -- apps/api/ 2>/dev/null; then
+  DIRTY_SUFFIX="-dirty.$(date +%s)"
+fi
+TAG="${GIT_SHA}${DIRTY_SUFFIX}"
 IMAGE="$REGISTRY/api:$TAG"
 DOCKER="${DOCKER:-docker}"
 TF_DIR="$ROOT_DIR/infra/terraform"

@@ -15,7 +15,8 @@ interface AudioPlayerProps {
   onProgress?: (progressSeconds: number) => void
   onTimeUpdate?: (currentTime: number) => void
   onPlayingChange?: (isPlaying: boolean) => void
-  onEnded?: () => void
+  onEnded?: (() => void) | undefined
+  onError?: (() => void) | undefined
 }
 
 const PROGRESS_REPORT_INTERVAL_S = 10
@@ -29,6 +30,7 @@ export function AudioPlayer({
   onTimeUpdate,
   onPlayingChange,
   onEnded,
+  onError: onErrorCallback,
 }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null)
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -37,6 +39,7 @@ export function AudioPlayer({
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [isReady, setIsReady] = useState(false)
+  const [hasError, setHasError] = useState(false)
   const [speedIndex, setSpeedIndex] = useState(1) // default 1x
 
   const speed = SPEEDS[speedIndex] ?? 1
@@ -50,6 +53,7 @@ export function AudioPlayer({
     // Reset state for new track
     setCurrentTime(0)
     setIsReady(false)
+    setHasError(false)
     onTimeUpdate?.(0)
 
     // Load new source — canplay handler will trigger autoplay
@@ -110,12 +114,19 @@ export function AudioPlayer({
       onProgress?.(durationSeconds)
       onEnded?.()
     }
+    const onError = () => {
+      setHasError(true)
+      setIsPlaying(false)
+      onPlayingChange?.(false)
+      onErrorCallback?.()
+    }
 
     audio.addEventListener('play', onPlay)
     audio.addEventListener('pause', onPause)
     audio.addEventListener('timeupdate', onTime)
     audio.addEventListener('canplay', onCanPlay)
     audio.addEventListener('ended', onEndedEvt)
+    audio.addEventListener('error', onError)
 
     return () => {
       audio.removeEventListener('play', onPlay)
@@ -123,8 +134,9 @@ export function AudioPlayer({
       audio.removeEventListener('timeupdate', onTime)
       audio.removeEventListener('canplay', onCanPlay)
       audio.removeEventListener('ended', onEndedEvt)
+      audio.removeEventListener('error', onError)
     }
-  }, [durationSeconds, autoPlay, onProgress, onTimeUpdate, onPlayingChange, onEnded])
+  }, [durationSeconds, autoPlay, onProgress, onTimeUpdate, onPlayingChange, onEnded, onErrorCallback])
 
   // Set playback rate when speed changes
   useEffect(() => {
@@ -196,6 +208,14 @@ export function AudioPlayer({
         <span>{formatTime(durationSeconds)}</span>
       </div>
 
+      {/* Error state */}
+      {hasError && (
+        <div className="mb-3 flex items-center justify-center gap-2">
+          <Icon name="error_outline" size={16} className="text-error" />
+          <span className="font-body text-xs text-error">Audio failed to load</span>
+        </div>
+      )}
+
       {/* Controls */}
       <div className="flex items-center justify-center gap-6">
         <button
@@ -210,11 +230,15 @@ export function AudioPlayer({
 
         <button
           onClick={togglePlay}
-          disabled={!isReady}
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-on-primary transition-all duration-300 hover:brightness-110 active:scale-95 disabled:opacity-40"
-          aria-label={isPlaying ? 'Pause' : 'Play'}
+          disabled={!isReady && !hasError}
+          className={`flex h-14 w-14 items-center justify-center rounded-full transition-all duration-300 active:scale-95 disabled:opacity-40 ${
+            hasError
+              ? 'bg-error/15 text-error'
+              : 'bg-primary text-on-primary hover:brightness-110'
+          }`}
+          aria-label={hasError ? 'Audio unavailable' : isPlaying ? 'Pause' : 'Play'}
         >
-          <Icon name={isPlaying ? 'pause' : 'play_arrow'} size={28} filled />
+          <Icon name={hasError ? 'error_outline' : isPlaying ? 'pause' : 'play_arrow'} size={28} filled />
         </button>
 
         <button

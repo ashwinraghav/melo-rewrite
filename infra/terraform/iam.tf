@@ -51,7 +51,7 @@ resource "google_service_account_iam_member" "api_token_creator" {
 # bucket (melo-f5756.firebasestorage.app). This is separate from the public
 # stories bucket — voice data is private per-user via Security Rules.
 resource "google_storage_bucket_iam_member" "api_firebase_storage" {
-  bucket = "${var.project_id}.firebasestorage.app"
+  bucket = google_storage_bucket.firebase_storage.name
   role   = "roles/storage.objectAdmin"
   member = "serviceAccount:${google_service_account.api.email}"
 }

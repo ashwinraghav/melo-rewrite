@@ -47,6 +47,46 @@ resource "google_storage_bucket" "stories" {
   depends_on = [google_project_service.apis]
 }
 
+# ── Firebase Storage bucket (private voice data) ─────────────────────────────
+#
+# Default Firebase Storage bucket. Created by the Firebase platform but managed
+# here for CORS configuration. Stores private per-user voice samples and
+# converted audio under paths like:
+#   voices/{uid}/{voiceId}/sample.webm
+#   voices/{uid}/{voiceId}/conversions/{storyId}.mp3
+#
+# Access control is via Firebase Security Rules (not IAM), so
+# uniform_bucket_level_access is false.
+
+resource "google_storage_bucket" "firebase_storage" {
+  name          = "${var.project_id}.firebasestorage.app"
+  location      = "US-CENTRAL1"
+  project       = var.project_id
+  storage_class = "REGIONAL"
+  force_destroy = false
+
+  uniform_bucket_level_access = false
+
+  # Required for signed URL audio playback from the web app.
+  # Without CORS, browsers block cross-origin <audio> range requests.
+  cors {
+    origin          = ["*"]
+    method          = ["GET", "HEAD"]
+    response_header = ["Content-Type", "Content-Length", "Accept-Ranges"]
+    max_age_seconds = 3600
+  }
+
+  soft_delete_policy {
+    retention_duration_seconds = 604800 # 7 days
+  }
+
+  lifecycle {
+    prevent_destroy = true
+    # Firebase may update ACLs and metadata — don't fight it.
+    ignore_changes = [labels]
+  }
+}
+
 # ── Terraform state bucket ─────────────────────────────────────────────────────
 #
 # This bucket stores Terraform remote state. It must be created BEFORE running
