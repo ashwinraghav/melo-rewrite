@@ -43,6 +43,9 @@ export function CreateContent() {
   const [publishPhase, setPublishPhase] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
+  // Age tier selection
+  const [selectedAge, setSelectedAge] = useState<number | null>(null)
+
   // Editable draft fields
   const [editTitle, setEditTitle] = useState('')
   const [editDescription, setEditDescription] = useState('')
@@ -55,8 +58,8 @@ export function CreateContent() {
 
   // Generate mutation — returns 202 immediately, Cloud Tasks does the work
   const generateMutation = useMutation({
-    mutationFn: (promptText: string) =>
-      client.post<{ id: string; generateStatus: string }>('/v1/creator/generate', { prompt: promptText }),
+    mutationFn: ({ promptText, age }: { promptText: string; age: number }) =>
+      client.post<{ id: string; generateStatus: string }>('/v1/creator/generate', { prompt: promptText, age }),
     retry: false,
     onSuccess: (response) => {
       const data = (response as ApiResponse<{ id: string; generateStatus: string }>).data
@@ -159,12 +162,12 @@ export function CreateContent() {
 
   // Handlers
   const handleGenerate = useCallback(() => {
-    if (!prompt.trim()) return
+    if (!prompt.trim() || !selectedAge) return
     setError(null)
     setState('generating')
     trackGenerateStart(prompt.length)
-    generateMutation.mutate(prompt)
-  }, [prompt, generateMutation])
+    generateMutation.mutate({ promptText: prompt, age: selectedAge })
+  }, [prompt, selectedAge, generateMutation])
 
   const handlePublish = useCallback(async () => {
     if (!draft) return
@@ -197,6 +200,7 @@ export function CreateContent() {
   const handleReset = useCallback(() => {
     setState('prompt')
     setPrompt('')
+    setSelectedAge(null)
     setDraft(null)
     setPublishedStory(null)
     setActiveStoryId(null)
@@ -292,9 +296,38 @@ export function CreateContent() {
               </div>
             </div>
 
+            {/* Age tier selector */}
+            <div className="mt-5">
+              <div className="mb-3 flex items-center gap-2">
+                <Icon name="child_care" size={18} className="text-tertiary" />
+                <span className="font-body text-xs uppercase tracking-widest text-tertiary">
+                  Age Group
+                </span>
+              </div>
+              <div className="flex gap-3">
+                {([
+                  { age: 2, label: 'Toddler', range: '1–3 yrs' },
+                  { age: 4, label: 'Preschool', range: '3–6 yrs' },
+                ] as const).map(({ age, label, range }) => (
+                  <button
+                    key={age}
+                    onClick={() => setSelectedAge(age)}
+                    className={`flex-1 rounded-full px-4 py-3 font-body text-sm font-medium transition-all duration-300 ${
+                      selectedAge === age
+                        ? 'bg-secondary-container text-on-secondary-container'
+                        : 'bg-surface-container-high/40 text-on-surface-variant hover:bg-surface-container-highest/60'
+                    }`}
+                  >
+                    {label}
+                    <span className="ml-1.5 text-xs opacity-60">{range}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <motion.button
               onClick={handleGenerate}
-              disabled={!prompt.trim()}
+              disabled={!prompt.trim() || !selectedAge}
               className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-primary to-primary-dim px-6 py-4 font-body text-sm font-medium text-on-primary transition-all duration-300 hover:brightness-110 active:scale-[0.98] disabled:opacity-40 disabled:hover:brightness-100"
               whileTap={{ scale: 0.98 }}
             >

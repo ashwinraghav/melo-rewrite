@@ -40,6 +40,7 @@ tracer = trace.get_tracer(__name__)
 class GenerateStoryTask(BaseModel):
     storyId: str
     prompt: str
+    age: int
 
 class PublishStoryTask(BaseModel):
     storyId: str
@@ -98,7 +99,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
     ):
         t0 = time.monotonic()
         try:
-            generated = await services.story_generator.generate(body.prompt)
+            generated = await services.story_generator.generate(body.prompt, body.age)
 
             await repos.stories.update(body.storyId, {
                 "title": generated.title,
@@ -121,9 +122,9 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
             log.exception("generate-story failed for %s: %s", body.storyId, e)
             await repos.stories.update(body.storyId, {
                 "generate_status": "failed",
-                "generate_error": str(e),
+                "generate_error": "Story generation failed. Please try again.",
             })
-            return {"status": "failed", "detail": str(e)}
+            return {"status": "failed"}
 
     @router.post("/publish-story")
     async def publish_story_task(
@@ -180,9 +181,9 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
             await repos.stories.update(body.storyId, {
                 "publish_status": "failed",
                 "publish_step": "",
-                "publish_error": str(e),
+                "publish_error": "Story publishing failed. Please try again.",
             })
-            return {"status": "failed", "detail": str(e)}
+            return {"status": "failed"}
 
     @router.post("/clone-voice")
     async def clone_voice_task(
@@ -205,7 +206,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         except Exception as e:
             log.exception("clone-voice failed for voice %s: %s", body.voiceId, e)
             await repos.voices.update(body.ownerUid, body.voiceId, {"status": "failed"})
-            return {"status": "failed", "detail": str(e)}
+            return {"status": "failed"}
 
     @router.post("/convert-story")
     async def convert_story_task(
@@ -233,6 +234,6 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         except Exception as e:
             log.exception("convert-story failed: %s", e)
             await repos.conversions.update(body.uid, body.storyId, body.voiceId, {"status": "failed"})
-            return {"status": "failed", "detail": str(e)}
+            return {"status": "failed"}
 
     return router

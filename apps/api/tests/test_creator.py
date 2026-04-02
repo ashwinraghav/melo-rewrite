@@ -23,7 +23,7 @@ def test_publish_requires_auth(creator_client):
 def test_generate_creates_draft(creator_client, repos):
     resp = creator_client.post(
         "/v1/creator/generate",
-        json={"prompt": "a story about a gentle breeze in a meadow"},
+        json={"prompt": "a story about a gentle breeze in a meadow", "age": 4},
         headers=auth(TEST_UID),
     )
     assert resp.status_code == 202
@@ -38,8 +38,8 @@ def test_generate_creates_draft(creator_client, repos):
     assert story.title == "The Gentle Breeze"
     assert len(story.story_text) > 0
     assert isinstance(story.topics, list)
-    assert story.age_min >= 1
-    assert story.age_max <= 12
+    assert story.age_min == 3
+    assert story.age_max == 6
 
 
 # ── Update draft ───────────────────────────────────────────────────────────
@@ -48,7 +48,7 @@ def test_update_draft(creator_client, repos):
     # First generate a story
     gen_resp = creator_client.post(
         "/v1/creator/generate",
-        json={"prompt": "test"},
+        json={"prompt": "test", "age": 4},
         headers=auth(TEST_UID),
     )
     story_id = gen_resp.json()["data"]["id"]
@@ -68,7 +68,7 @@ def test_update_published_story_fails(creator_client, repos):
     """Cannot edit a story that has already been published."""
     gen_resp = creator_client.post(
         "/v1/creator/generate",
-        json={"prompt": "test"},
+        json={"prompt": "test", "age": 4},
         headers=auth(TEST_UID),
     )
     story_id = gen_resp.json()["data"]["id"]
@@ -104,7 +104,7 @@ def test_publish_story(creator_client, repos):
     # Generate
     gen_resp = creator_client.post(
         "/v1/creator/generate",
-        json={"prompt": "test"},
+        json={"prompt": "test", "age": 4},
         headers=auth(TEST_UID),
     )
     story_id = gen_resp.json()["data"]["id"]
@@ -129,7 +129,7 @@ def test_publish_story(creator_client, repos):
 def test_publish_already_published_fails(creator_client, repos):
     gen_resp = creator_client.post(
         "/v1/creator/generate",
-        json={"prompt": "test"},
+        json={"prompt": "test", "age": 4},
         headers=auth(TEST_UID),
     )
     story_id = gen_resp.json()["data"]["id"]
@@ -174,7 +174,7 @@ def test_update_empty_body_fails(creator_client):
     """Sending an update with no changed fields returns 400."""
     gen_resp = creator_client.post(
         "/v1/creator/generate",
-        json={"prompt": "test"},
+        json={"prompt": "test", "age": 4},
         headers=auth(TEST_UID),
     )
     story_id = gen_resp.json()["data"]["id"]
@@ -192,7 +192,7 @@ def test_update_single_field_preserves_others(creator_client, repos):
     """Updating only the title leaves description unchanged."""
     gen_resp = creator_client.post(
         "/v1/creator/generate",
-        json={"prompt": "test"},
+        json={"prompt": "test", "age": 4},
         headers=auth(TEST_UID),
     )
     story_id = gen_resp.json()["data"]["id"]
@@ -218,7 +218,7 @@ def test_generated_story_has_user_source(creator_client, repos):
     """Stories created via the creator flow should have source='user'."""
     gen_resp = creator_client.post(
         "/v1/creator/generate",
-        json={"prompt": "test"},
+        json={"prompt": "test", "age": 4},
         headers=auth(TEST_UID),
     )
     story_id = gen_resp.json()["data"]["id"]
@@ -231,7 +231,7 @@ def test_published_story_retains_user_source(creator_client, repos):
     """After publishing, the source field should still be 'user'."""
     gen_resp = creator_client.post(
         "/v1/creator/generate",
-        json={"prompt": "test"},
+        json={"prompt": "test", "age": 4},
         headers=auth(TEST_UID),
     )
     story_id = gen_resp.json()["data"]["id"]
@@ -260,7 +260,7 @@ def test_publish_generates_segments(creator_client, repos):
     """Published stories should have timed segments for read-along."""
     gen_resp = creator_client.post(
         "/v1/creator/generate",
-        json={"prompt": "test"},
+        json={"prompt": "test", "age": 4},
         headers=auth(TEST_UID),
     )
     story_id = gen_resp.json()["data"]["id"]
@@ -282,7 +282,7 @@ def test_publish_generates_embedding(creator_client, repos):
     """Published stories should have an embedding for semantic search."""
     gen_resp = creator_client.post(
         "/v1/creator/generate",
-        json={"prompt": "test"},
+        json={"prompt": "test", "age": 4},
         headers=auth(TEST_UID),
     )
     story_id = gen_resp.json()["data"]["id"]
@@ -300,7 +300,7 @@ def test_published_story_visible_in_stories_list(creator_client):
     """A published creator story should appear in GET /v1/stories."""
     gen_resp = creator_client.post(
         "/v1/creator/generate",
-        json={"prompt": "test"},
+        json={"prompt": "test", "age": 4},
         headers=auth(TEST_UID),
     )
     story_id = gen_resp.json()["data"]["id"]
@@ -317,3 +317,47 @@ def test_published_story_visible_in_stories_list(creator_client):
     )
     ids = [s["id"] for s in resp.json()["data"]]
     assert story_id in ids
+
+
+# ── Age field validation ────────────────────────────────────────────────
+
+def test_generate_requires_age(creator_client):
+    """Missing age field returns 422 validation error."""
+    resp = creator_client.post(
+        "/v1/creator/generate",
+        json={"prompt": "test"},
+        headers=auth(TEST_UID),
+    )
+    assert resp.status_code == 422
+
+
+def test_generate_age_out_of_range(creator_client):
+    """Age outside 1-6 returns 422."""
+    resp = creator_client.post(
+        "/v1/creator/generate",
+        json={"prompt": "test", "age": 0},
+        headers=auth(TEST_UID),
+    )
+    assert resp.status_code == 422
+
+    resp = creator_client.post(
+        "/v1/creator/generate",
+        json={"prompt": "test", "age": 7},
+        headers=auth(TEST_UID),
+    )
+    assert resp.status_code == 422
+
+
+def test_generate_toddler_tier(creator_client, repos):
+    """Age 1-3 uses the toddler tier mock."""
+    gen_resp = creator_client.post(
+        "/v1/creator/generate",
+        json={"prompt": "a bedtime story", "age": 2},
+        headers=auth(TEST_UID),
+    )
+    story_id = gen_resp.json()["data"]["id"]
+
+    story = asyncio.run(repos.stories.find_by_id_any(story_id))
+    assert story.title == "The Sleepy Bunny"
+    assert story.age_min == 1
+    assert story.age_max == 3

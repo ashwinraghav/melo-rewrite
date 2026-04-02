@@ -70,15 +70,19 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         story_id = uuid.uuid4().hex
         now = _now()
 
+        # Determine age bracket from the user-supplied age
+        age_min, age_max = (1, 3) if body.age <= 3 else (3, 6)
+
         # Create a placeholder story — Claude will fill in content via the task
         story = Story(
             id=story_id,
+            owner_uid=_user.uid,
             title="",
             description="",
             duration_seconds=0,
             duration_category="short",
-            age_min=1,
-            age_max=6,
+            age_min=age_min,
+            age_max=age_max,
             topics=[],
             audio_path="",
             cover_art_path="",
@@ -94,7 +98,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
 
         await services.task_queue.enqueue(
             "generate-story",
-            {"storyId": story_id, "prompt": body.prompt},
+            {"storyId": story_id, "prompt": body.prompt, "age": body.age},
             dedup_id=story_id,
         )
 
@@ -111,6 +115,8 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         story = await repos.stories.find_by_id_any(story_id)
         if story is None:
             raise HTTPException(status_code=404, detail="Story not found")
+        if story.owner_uid and story.owner_uid != _user.uid:
+            raise HTTPException(status_code=403, detail="Not authorized")
         if story.is_published:
             raise HTTPException(status_code=400, detail="Cannot edit a published story")
 
@@ -142,6 +148,8 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         story = await repos.stories.find_by_id_any(story_id)
         if story is None:
             raise HTTPException(status_code=404, detail="Story not found")
+        if story.owner_uid and story.owner_uid != _user.uid:
+            raise HTTPException(status_code=403, detail="Not authorized")
         if story.is_published:
             raise HTTPException(status_code=400, detail="Story is already published")
 
@@ -182,6 +190,8 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         story = await repos.stories.find_by_id_any(story_id)
         if story is None:
             raise HTTPException(status_code=404, detail="Story not found")
+        if story.owner_uid and story.owner_uid != _user.uid:
+            raise HTTPException(status_code=403, detail="Not authorized")
         result: dict = {
             "generateStatus": story.generate_status,
             "generateError": story.generate_error,

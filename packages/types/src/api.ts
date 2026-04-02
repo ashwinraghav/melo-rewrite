@@ -54,6 +54,7 @@ export interface RecordProgressBody {
 
 export interface GenerateStoryBody {
   prompt: string
+  age: number
 }
 
 export interface GeneratedStoryDraft {
@@ -158,6 +159,8 @@ export interface StoryWithAudioUrl {
   /** Pre-signed URL valid for 15 minutes. */
   audioUrl: string
   coverArtUrl: string
+  /** 96px thumbnail for list views (2x retina for 48px display). */
+  coverArtThumbUrl?: string
   /** Full story text (detail endpoint only). */
   storyText?: string
   /** Timed segments for read-along (detail endpoint only). */

@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Literal
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 StoryDuration = Literal["short", "medium", "long"]
@@ -40,6 +40,7 @@ class Story(CamelModel):
     topics: list[str]
     audio_path: str
     cover_art_path: str
+    owner_uid: str = ""
     story_text: str = ""
     segments: list[StorySegment] = []
     themes: str = ""
@@ -66,6 +67,7 @@ class StoryWithAudioUrl(CamelModel):
     topics: list[str]
     audio_url: str
     cover_art_url: str
+    cover_art_thumb_url: str = ""
     story_text: str | None = None
     segments: list[StorySegment] | None = None
     source: StorySource = "curated"
@@ -86,7 +88,8 @@ class StoryFilters(BaseModel):
 
 
 class GenerateStoryRequest(CamelModel):
-    prompt: str
+    prompt: str = Field(min_length=1, max_length=2000)
+    age: int = Field(ge=1, le=6)
 
 
 class GenerateStoryResponse(CamelModel):
@@ -110,6 +113,6 @@ class UpdateDraftRequest(CamelModel):
 
 
 class SearchStoriesRequest(CamelModel):
-    query: str
-    child_age: int | None = None
-    limit: int = 10
+    query: str = Field(min_length=1, max_length=500)
+    child_age: int | None = Field(default=None, ge=1, le=12)
+    limit: int = Field(default=10, ge=1, le=50)

@@ -29,58 +29,167 @@ class GeneratedStory:
     age_max: int
 
 
-SYSTEM_PROMPT = """\
-You are a children's story writer for Mello, an app that produces calm, lo-fi audio stories \
-for young children (ages 1-12).
+# ---------------------------------------------------------------------------
+# System prompt components
+# ---------------------------------------------------------------------------
 
-Given the user's prompt (which may be anything from a rough outline to a full story), \
-produce a complete, well-written story suitable for audio narration.
+_THINKING_PREAMBLE = """\
+You are a children's story writer for Mello, an app that produces audio stories for young children.
 
-Guidelines:
-- Calm, gentle, soothing tone — like a bedtime storybook
-- Age-appropriate vocabulary and themes
-- 200-500 words (ideal length for 2-5 minute audio)
-- Simple sentence structure for clear narration
-- End on a peaceful, positive note
-- No violence, scary content, or overly stimulating themes
+THINKING PHASE — use your extended thinking to work through these steps before outputting anything:
+1. Analyze the user's prompt. Infer: a specific protagonist with a personality flaw or want \
+(not a generic "kind bunny" — give them a quirk), an emotional arc (e.g. fear → courage, \
+frustration → patience), and the story type (bedtime, adventure, silly, lesson).
+2. Plan the story structure. List every beat, decide the repeated refrain, \
+and place participation cues ("Can you…?") at specific moments.
+3. Write the full draft.
+4. Self-audit the draft — check every item below and revise if any fails:
+   a. Name discipline: protagonist's name appears at most once per 80 words. \
+Replace extras with pronouns or descriptions ("the little fox", "our hero").
+   b. Show don't tell: find every sentence that names an emotion ("felt scared", \
+"was happy"). Rewrite each one as action, body language, or dialogue.
+   c. Rhythm: read each sentence aloud mentally. Rewrite any that feel clunky \
+or have awkward cadence.
+   d. Participation: verify participation cues are present (see age-group rules).
+   e. Refrain: confirm the refrain appears the required number of times, \
+with a meaningful pattern break or variation on the final occurrence.
+5. Revise the draft if any audit check failed.
+6. Output ONLY the final JSON object — no commentary, no markdown fences."""
 
-Respond with ONLY a JSON object (no markdown, no code fences) with these fields:
+_TODDLER_PROMPT = """\
+AGE GROUP: Toddler (ages 1–3)
+
+STRUCTURE:
+- 100–150 words total. HARD MAXIMUM: 150 words.
+- Sentences of 3–6 words each.
+- No complex plot — a single simple situation: discovering, naming, counting, or playing.
+- Repeat a core phrase at least 3 times with a small, delightful variation on the last repetition.
+- Musical, sing-song cadence — every sentence should feel like it could be sung.
+- End peacefully: sleeping, cuddling, or settling down.
+
+VOCABULARY:
+- Only words a 2-year-old hears daily.
+- Focus on: naming things, animal sounds, vehicle sounds, body parts, emotions (happy, sad, sleepy, silly).
+- Onomatopoeia encouraged: splash, boom, whoosh, moo, buzz.
+
+AUDIO PACING:
+- Use "..." for dramatic pauses before a reveal or repeated phrase.
+- Include at least 1 participation cue: "Can you moo like a cow?" or "Where did the bunny go?"
+- Do NOT include any square-bracket tags like [soft] or [whispers] in the story text.
+
+TONE:
+- Calm, warm, soothing — like a parent whispering at bedtime.
+- Gentle humor through silly sounds and surprise.
+
+Respond with ONLY a JSON object (no markdown, no code fences):
 {
-  "title": "Short, engaging title",
+  "title": "Short, engaging title (max 6 words)",
   "description": "One sentence summary (under 100 characters)",
-  "storyText": "The full story text, written as continuous prose with proper sentences.",
-  "topics": ["one or two topic tags, e.g. park, friends, bedtime, food, animals, nature"],
-  "themes": "An elaborate paragraph describing the deeper themes, lessons, emotions, and real-life situations this story addresses. Write as if explaining to a parent what their child will learn. Include specific scenarios like 'sibling jealousy', 'first day of school anxiety', 'learning to share with a new baby'. Be thorough — this text powers semantic search so parents can find stories by describing their child's situation.",
+  "storyText": "The full story text with ... pauses inline. No square-bracket tags.",
+  "topics": ["1–2 topic tags, e.g. animals, bedtime, nature, sounds"],
+  "themes": "A thorough paragraph describing the deeper themes, lessons, emotions, and real-life situations this story addresses. Write as if explaining to a parent what their child will learn. Include specific scenarios. This text powers semantic search so parents can find stories by describing their child's situation.",
   "ageMin": 1,
-  "ageMax": 6
-}
-"""
+  "ageMax": 3
+}"""
 
+_PRESCHOOL_PROMPT = """\
+AGE GROUP: Preschool (ages 3–6)
+
+STRUCTURE:
+- 500–800 words total. HARD MAXIMUM: 800 words.
+- Rule of 3: the protagonist tries to solve their problem, fails in a funny way, \
+tries again differently, fails again, then discovers an unexpected solution on their own \
+(never rescued by an adult).
+- The protagonist MUST have a specific personality flaw or want that drives the story — \
+not just a situation. "A shy turtle who dreams of singing at the pond concert" beats \
+"a story about a turtle."
+- Emotional arc: setup (establish the want and the obstacle) → rising tension (two failures, \
+each funnier than the last) → climax (creative solution the child discovers themselves) → \
+resolution (lesson felt through the character's relief/joy, never stated as a moral).
+- A repeated refrain — a catchphrase, song snippet, or ritual phrase — that appears at \
+least 3 times, with a meaningful variation or pattern break on the final occurrence.
+- At least one genuinely absurd or funny moment (silly misunderstanding, ridiculous sound, \
+unexpected comparison).
+
+VOCABULARY:
+- Rich but accessible. Introduce 1–2 "delicious" words a preschooler might not know yet, \
+with enough context that meaning is clear (e.g. "magnificent" used right after "the biggest, \
+most beautiful").
+- Dialogue-heavy — characters should talk to each other and to the listener.
+- Vary sentence length: short punchy sentences for action and suspense, longer flowing \
+sentences for description and settling moments.
+
+AUDIO PACING:
+- Use "..." for dramatic pauses before reveals, punchlines, or refrain repetitions.
+- Include 2–3 participation cues woven naturally into the story: \
+"Can you roar like a lion?", "What do you think she found behind the door?", \
+"Say it with me: ..."
+- Do NOT include any square-bracket tags like [soft] or [narration] in the story text.
+
+TONE:
+- Warm and energetic — a skilled storyteller performing for a small audience.
+- Show don't tell: convey emotions through action, body language, and dialogue, not exposition.
+  BAD: "Luna felt scared."
+  GOOD: "Luna's tail tucked under her belly and she pressed flat against the wall."
+- Name discipline: after introducing the protagonist, favor pronouns, descriptions \
+("the little fox", "our hero"), or dialogue attribution. The name should appear at most \
+once per 80 words.
+- Rhythmic prose: even without rhyme, sentences should have a natural cadence. \
+Read them aloud mentally and smooth any clunky passages.
+- Re-readability: the refrain should be something a child wants to say along with you. \
+The story should reward a second listen with details noticed the second time.
+
+Respond with ONLY a JSON object (no markdown, no code fences):
+{
+  "title": "Short, engaging title (max 8 words)",
+  "description": "One sentence summary (under 100 characters)",
+  "storyText": "The full story text with ... pauses and participation cues inline. No square-bracket tags.",
+  "topics": ["1–3 topic tags, e.g. animals, friendship, bedtime, courage, nature"],
+  "themes": "A thorough paragraph describing the deeper themes, lessons, emotions, and real-life situations this story addresses. Write as if explaining to a parent what their child will learn. Include specific scenarios like 'sibling jealousy', 'first day of school anxiety', 'learning to share with a new baby'. This text powers semantic search so parents can find stories by describing their child's situation.",
+  "ageMin": 3,
+  "ageMax": 6
+}"""
+
+
+def _build_system_prompt(age: int) -> str:
+    tier = _TODDLER_PROMPT if age <= 3 else _PRESCHOOL_PROMPT
+    return _THINKING_PREAMBLE + "\n\n" + tier
+
+
+# ---------------------------------------------------------------------------
+# ABC + implementations
+# ---------------------------------------------------------------------------
 
 class StoryGeneratorService(ABC):
     @abstractmethod
-    async def generate(self, prompt: str) -> GeneratedStory: ...
+    async def generate(self, prompt: str, age: int) -> GeneratedStory: ...
 
 
 class ClaudeStoryGenerator(StoryGeneratorService):
-    MODEL = "claude-sonnet-4-20250514"
+    MODEL = "claude-opus-4-20250514"
 
     def __init__(self, api_key: str) -> None:
         self._client = anthropic.AsyncAnthropic(api_key=api_key)
 
-    async def generate(self, prompt: str) -> GeneratedStory:
+    async def generate(self, prompt: str, age: int) -> GeneratedStory:
+        system_prompt = _build_system_prompt(age)
         with tracer.start_as_current_span(
             "anthropic.messages.create",
-            attributes={"anthropic.model": self.MODEL, "anthropic.max_tokens": 2048},
+            attributes={"anthropic.model": self.MODEL, "anthropic.max_tokens": 16000},
         ) as span:
             t0 = time.monotonic()
             try:
-                message = await self._client.messages.create(
+                async with self._client.messages.stream(
                     model=self.MODEL,
-                    max_tokens=2048,
-                    system=SYSTEM_PROMPT,
+                    max_tokens=16000,
+                    thinking={
+                        "type": "enabled",
+                        "budget_tokens": 10000,
+                    },
+                    system=system_prompt,
                     messages=[{"role": "user", "content": prompt}],
-                )
+                ) as stream:
+                    message = await stream.get_final_message()
                 duration = time.monotonic() - t0
                 anthropic_request_duration.record(duration, {"operation": "messages.create"})
                 span.set_attribute("anthropic.input_tokens", message.usage.input_tokens)
@@ -90,7 +199,16 @@ class ClaudeStoryGenerator(StoryGeneratorService):
                 span.set_status(trace.StatusCode.ERROR, str(e))
                 raise
 
-        raw = message.content[0].text
+        # Extract the text content block (skip thinking blocks)
+        raw = None
+        for block in message.content:
+            if block.type == "text":
+                raw = block.text
+                break
+
+        if raw is None:
+            raise ValueError("No text content block in Claude response")
+
         data = json.loads(raw)
         return GeneratedStory(
             title=data["title"],
@@ -106,14 +224,34 @@ class ClaudeStoryGenerator(StoryGeneratorService):
 class MockStoryGenerator(StoryGeneratorService):
     """Returns canned data for tests — no API calls."""
 
-    async def generate(self, prompt: str) -> GeneratedStory:
+    async def generate(self, prompt: str, age: int) -> GeneratedStory:
+        if age <= 3:
+            return GeneratedStory(
+                title="The Sleepy Bunny",
+                description="A little bunny hops home to bed.",
+                story_text=(
+                    "Hop, hop, hop... "
+                    "Little bunny hops. Hop, hop, hop. "
+                    "Can you hop like bunny? "
+                    "Hop, hop... sleep."
+                ),
+                topics=["animals", "bedtime"],
+                themes=(
+                    "This story helps toddlers wind down through repetitive, "
+                    "rhythmic language and gentle participation. It models the "
+                    "transition from active play to rest."
+                ),
+                age_min=1,
+                age_max=3,
+            )
         return GeneratedStory(
             title="The Gentle Breeze",
             description="A soft wind carries seeds across a meadow.",
             story_text=(
                 "Once upon a time, a gentle breeze drifted across a quiet meadow. "
                 "It carried tiny seeds from flower to flower. "
-                "Each seed found a warm spot in the earth. "
+                "Each seed found a warm spot in the earth... "
+                "Can you blow like the wind? "
                 "By morning, new blossoms had opened their petals to the sun."
             ),
             topics=["nature"],
@@ -122,6 +260,6 @@ class MockStoryGenerator(StoryGeneratorService):
                 "It teaches children that small actions can lead to wonderful outcomes, "
                 "and that nature works quietly and slowly to create beautiful things."
             ),
-            age_min=1,
+            age_min=3,
             age_max=6,
         )
