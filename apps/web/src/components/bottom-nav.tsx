@@ -143,25 +143,7 @@ function ProfileTab({
         aria-expanded={menuOpen}
         aria-haspopup="menu"
       >
-        <div className={cn(
-          'flex h-6 w-6 items-center justify-center overflow-hidden rounded-full transition-all',
-          isActive
-            ? 'ring-2 ring-primary ring-offset-1 ring-offset-surface-container-highest'
-            : 'ring-1 ring-on-surface-variant/20',
-        )}>
-          {photoURL ? (
-            <img
-              src={photoURL}
-              alt=""
-              className="h-full w-full object-cover"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <span className="font-display text-[9px] font-bold text-on-surface-variant">
-              {initials}
-            </span>
-          )}
-        </div>
+        <Avatar photoURL={photoURL} initials={initials} isActive={isActive} />
         <span className="font-body text-[10px] font-medium">You</span>
       </button>
 
@@ -213,6 +195,34 @@ function ProfileTab({
             <span className="font-body text-sm">Sign out</span>
           </button>
         </div>
+      )}
+    </div>
+  )
+}
+
+function Avatar({ photoURL, initials, isActive }: { photoURL: string | null | undefined; initials: string; isActive: boolean }) {
+  const [imgFailed, setImgFailed] = useState(false)
+  const showImg = photoURL && !imgFailed
+
+  return (
+    <div className={cn(
+      'flex h-6 w-6 items-center justify-center overflow-hidden rounded-full transition-all',
+      isActive
+        ? 'ring-2 ring-primary ring-offset-1 ring-offset-surface-container-highest'
+        : 'ring-1 ring-on-surface-variant/20',
+    )}>
+      {showImg ? (
+        <img
+          src={photoURL}
+          alt=""
+          className="h-full w-full object-cover"
+          referrerPolicy="no-referrer"
+          onError={() => setImgFailed(true)}
+        />
+      ) : (
+        <span className="font-display text-[9px] font-bold text-on-surface-variant">
+          {initials}
+        </span>
       )}
     </div>
   )
