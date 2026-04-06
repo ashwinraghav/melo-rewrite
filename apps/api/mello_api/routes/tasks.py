@@ -154,9 +154,8 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
 
             with tracer.start_as_current_span("publish.finalize"):
                 await repos.stories.update(body.storyId, {"publish_step": "finalizing"})
-                await repos.stories.update(body.storyId, {
+                finalize_data: dict = {
                     "audio_path": audio_result.audio_path,
-                    "cover_art_path": cover_path,
                     "duration_seconds": audio_result.duration_seconds,
                     "duration_category": categorize_duration(audio_result.duration_seconds),
                     "segments": audio_result.segments,
@@ -165,7 +164,10 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
                     "publish_status": "ready",
                     "publish_step": "",
                     "publish_error": "",
-                })
+                }
+                if cover_path:
+                    finalize_data["cover_art_path"] = cover_path
+                await repos.stories.update(body.storyId, finalize_data)
 
                 services.search.invalidate()
                 all_stories = await repos.stories.find_many(StoryFilters())

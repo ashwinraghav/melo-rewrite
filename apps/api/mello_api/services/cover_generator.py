@@ -64,12 +64,24 @@ def build_cover_prompt(title: str, description: str, topics: list[str]) -> str:
     )
 
 
+def build_safe_fallback_prompt(topics: list[str]) -> str:
+    """Stripped-down prompt used when the full prompt trips the safety filter."""
+    topic = topics[0] if topics else "park"
+    palette_hint = TOPIC_PALETTE.get(topic, "")
+    return (
+        f"{STYLE_PROMPT}\n\n"
+        f"A peaceful, calming nature scene.\n"
+        f"{palette_hint}\n\n"
+        f"Illustrate a serene landscape with animals and soft colors. No people."
+    )
+
+
 class CoverGeneratorService(ABC):
     @abstractmethod
     async def generate_and_upload(
         self, story_id: str, title: str, description: str, topics: list[str]
-    ) -> str:
-        """Generate cover art and upload to GCS. Returns the GCS path."""
+    ) -> str | None:
+        """Generate cover art and upload to GCS. Returns the GCS path, or None if generation failed."""
         ...
 
 
@@ -83,9 +95,10 @@ class VertexCoverGenerator(CoverGeneratorService):
 
     async def generate_and_upload(
         self, story_id: str, title: str, description: str, topics: list[str]
-    ) -> str:
+    ) -> str | None:
         prompt = build_cover_prompt(title, description, topics)
         gcs_path = f"stories/{story_id}/cover.webp"
+        safety_rejected = False
 
         # Retry — Imagen's safety filter can spuriously reject prompts
         image_data = None
@@ -96,6 +109,7 @@ class VertexCoverGenerator(CoverGeneratorService):
                     "genai.model": MODEL,
                     "genai.operation": "generate_images",
                     "genai.attempt": attempt + 1,
+                    "genai.safety_fallback": safety_rejected,
                 },
             ) as span:
                 t0 = time.monotonic()
@@ -106,58 +120,107 @@ class VertexCoverGenerator(CoverGeneratorService):
                         config=types.GenerateImagesConfig(
                             number_of_images=1,
                             aspect_ratio="1:1",
+                            include_rai_reason=True,
                         ),
                     )
                     genai_request_duration.record(
                         time.monotonic() - t0, {"operation": "generate_images"}
                     )
                     if response.generated_images:
-                        image_data = response.generated_images[0].image.image_bytes
-                        break
-                    log.warning("Imagen returned no images (attempt %d/%d)", attempt + 1, MAX_RETRIES)
-                    span.set_attribute("genai.empty_response", True)
+                        img = response.generated_images[0]
+                        if img.rai_filtered_reason:
+                            log.warning(
+                                "Imagen image filtered (attempt %d/%d, story=%s): %s",
+                                attempt + 1, MAX_RETRIES, story_id, img.rai_filtered_reason,
+                            )
+                            span.set_attribute("genai.rai_filtered_reason", img.rai_filtered_reason)
+                            safety_rejected = True
+                        elif img.image and img.image.image_bytes:
+                            image_data = img.image.image_bytes
+                            break
+                        else:
+                            log.warning(
+                                "Imagen returned image entry with no data (attempt %d/%d, story=%s)",
+                                attempt + 1, MAX_RETRIES, story_id,
+                            )
+                    else:
+                        log.warning(
+                            "Imagen returned no images (attempt %d/%d, story=%s)",
+                            attempt + 1, MAX_RETRIES, story_id,
+                        )
+                        span.set_attribute("genai.empty_response", True)
                 except Exception as e:
                     genai_errors.add(1, {"operation": "generate_images"})
                     span.set_status(trace.StatusCode.ERROR, str(e))
-                    log.warning("Imagen error (attempt %d/%d): %s", attempt + 1, MAX_RETRIES, e)
+                    err_str = str(e)
+                    if "sensitive words" in err_str or "Responsible AI" in err_str:
+                        safety_rejected = True
+                        log.warning(
+                            "Imagen prompt rejected by safety filter (attempt %d/%d, story=%s): %s",
+                            attempt + 1, MAX_RETRIES, story_id, e,
+                        )
+                    else:
+                        log.warning(
+                            "Imagen error (attempt %d/%d, story=%s): %s",
+                            attempt + 1, MAX_RETRIES, story_id, e,
+                        )
+
+            # On safety rejection, swap to a generic prompt for remaining attempts
+            if safety_rejected and prompt != build_safe_fallback_prompt(topics):
+                prompt = build_safe_fallback_prompt(topics)
+                log.info("Switching to safe fallback prompt for story=%s", story_id)
+
             if attempt < MAX_RETRIES - 1:
                 await asyncio.sleep(2)
 
         if image_data is None:
-            log.warning("Cover art generation failed after %d attempts, publishing without cover", MAX_RETRIES)
-            return gcs_path
+            log.error(
+                "Cover art generation failed after %d attempts for story=%s (safety_rejected=%s), "
+                "publishing without cover",
+                MAX_RETRIES, story_id, safety_rejected,
+            )
+            return None
 
         image = Image.open(io.BytesIO(image_data))
-        image = image.resize((512, 512), Image.LANCZOS)
 
-        buf = io.BytesIO()
-        image.save(buf, "WEBP", quality=85)
-        buf.seek(0)
-        image_bytes = buf.read()
+        # Generate multiple sizes for mobile-first responsive loading:
+        #   cover.webp  — 384px for player/favorites (192px @ 2x retina)
+        #   thumb.webp  — 96px for list thumbnails (48px @ 2x retina)
+        variants = [
+            (gcs_path, 384, 80),
+            (f"stories/{story_id}/thumb.webp", 96, 75),
+        ]
 
-        with tracer.start_as_current_span(
-            "gcs.upload",
-            attributes={
-                "gcs.bucket": self._bucket_name,
-                "gcs.path": gcs_path,
-                "gcs.operation": "upload",
-                "gcs.bytes": len(image_bytes),
-            },
-        ) as span:
-            t0 = time.monotonic()
-            try:
-                await self._storage.upload(
-                    self._bucket_name, gcs_path, image_bytes,
-                    content_type="image/webp",
-                )
-                gcs_operation_duration.record(
-                    time.monotonic() - t0,
-                    {"operation": "upload", "bucket": self._bucket_name},
-                )
-            except Exception as e:
-                gcs_errors.add(1, {"operation": "upload", "bucket": self._bucket_name})
-                span.set_status(trace.StatusCode.ERROR, str(e))
-                raise
+        for variant_path, size, quality in variants:
+            resized = image.resize((size, size), Image.LANCZOS)
+            buf = io.BytesIO()
+            resized.save(buf, "WEBP", quality=quality)
+            buf.seek(0)
+            variant_bytes = buf.read()
+
+            with tracer.start_as_current_span(
+                "gcs.upload",
+                attributes={
+                    "gcs.bucket": self._bucket_name,
+                    "gcs.path": variant_path,
+                    "gcs.operation": "upload",
+                    "gcs.bytes": len(variant_bytes),
+                },
+            ) as span:
+                t0 = time.monotonic()
+                try:
+                    await self._storage.upload(
+                        self._bucket_name, variant_path, variant_bytes,
+                        content_type="image/webp",
+                    )
+                    gcs_operation_duration.record(
+                        time.monotonic() - t0,
+                        {"operation": "upload", "bucket": self._bucket_name},
+                    )
+                except Exception as e:
+                    gcs_errors.add(1, {"operation": "upload", "bucket": self._bucket_name})
+                    span.set_status(trace.StatusCode.ERROR, str(e))
+                    raise
 
         return gcs_path
 
