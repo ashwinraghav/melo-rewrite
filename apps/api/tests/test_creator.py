@@ -18,6 +18,47 @@ def test_publish_requires_auth(creator_client):
     assert resp.status_code == 401
 
 
+# ── Creator access gate ───────────────────────────────────────────────────
+
+def test_generate_requires_creator(creator_client):
+    """Non-creator users get 403 on generate."""
+    resp = creator_client.post(
+        "/v1/creator/generate",
+        json={"prompt": "a story", "age": 4},
+        headers=auth(TEST_UID, creator=False),
+    )
+    assert resp.status_code == 403
+    assert "creator" in resp.json()["detail"].lower()
+
+
+def test_update_draft_requires_creator(creator_client):
+    """Non-creator users get 403 on update draft."""
+    resp = creator_client.patch(
+        "/v1/creator/stories/fake-id",
+        json={"title": "Nope"},
+        headers=auth(TEST_UID, creator=False),
+    )
+    assert resp.status_code == 403
+
+
+def test_publish_requires_creator(creator_client):
+    """Non-creator users get 403 on publish."""
+    resp = creator_client.post(
+        "/v1/creator/stories/fake-id/publish",
+        headers=auth(TEST_UID, creator=False),
+    )
+    assert resp.status_code == 403
+
+
+def test_status_requires_creator(creator_client):
+    """Non-creator users get 403 on status polling."""
+    resp = creator_client.get(
+        "/v1/creator/stories/fake-id/status",
+        headers=auth(TEST_UID, creator=False),
+    )
+    assert resp.status_code == 403
+
+
 # ── Generate ───────────────────────────────────────────────────────────────
 
 def test_generate_creates_draft(creator_client, repos):

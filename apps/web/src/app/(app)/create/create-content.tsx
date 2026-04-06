@@ -13,10 +13,11 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useAuthContext } from '@/context/auth-context'
 import { useApiClient } from '@/hooks/useApiClient'
 import { Icon } from '@/components/icon'
 import { trackGenerateStart, trackGenerateComplete, trackPublishStart, trackPublishComplete } from '@/lib/analytics'
-import type { ApiResponse, GeneratedStoryDraft, StoryWithAudioUrl, PublishStatus, GenerateStatus } from '@mello/types'
+import type { ApiResponse, UserProfile, GeneratedStoryDraft, StoryWithAudioUrl, PublishStatus, GenerateStatus } from '@mello/types'
 
 type FlowState = 'prompt' | 'generating' | 'review' | 'publishing' | 'success'
 
@@ -33,7 +34,38 @@ function getPhase(index: number) {
 
 export function CreateContent() {
   const router = useRouter()
+  const { user } = useAuthContext()
   const client = useApiClient()
+
+  const { data: profileResponse, isLoading: profileLoading } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => client.get<UserProfile>('/v1/me'),
+    enabled: !!user,
+  })
+  const profile = (profileResponse as ApiResponse<UserProfile> | undefined)?.data
+
+  // Gate: non-creators see a fallback instead of the create flow
+  if (!profileLoading && profile && !profile.isCreator) {
+    return (
+      <div className="flex min-h-[60dvh] flex-col items-center justify-center px-6 text-center">
+        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-surface-container-high">
+          <Icon name="lock" size={36} className="text-on-surface-variant/60" />
+        </div>
+        <h2 className="mb-2 font-display text-xl font-bold text-on-surface">
+          Creator Access Required
+        </h2>
+        <p className="mb-8 max-w-sm font-body text-sm leading-relaxed text-on-surface-variant">
+          Story creation is available to approved creators. Check back soon as we expand access.
+        </p>
+        <button
+          onClick={() => router.push('/discover')}
+          className="rounded-full bg-gradient-to-r from-primary to-primary-dim px-8 py-3 font-body text-sm font-medium text-on-primary transition-all duration-300 hover:brightness-110 active:scale-[0.98]"
+        >
+          Browse Stories
+        </button>
+      </div>
+    )
+  }
 
   // Flow state
   const [state, setState] = useState<FlowState>('prompt')

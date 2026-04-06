@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from ..middleware.auth import get_current_user, AuthenticatedUser
+from ..middleware.auth import require_creator, AuthenticatedUser
 from fastapi.responses import JSONResponse
 
 from ..models.story import (
@@ -63,7 +63,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
     @router.post("/generate", status_code=202)
     async def generate_story(
         body: GenerateStoryRequest,
-        _user: AuthenticatedUser = Depends(get_current_user),
+        _user: AuthenticatedUser = Depends(require_creator),
     ):
         """Enqueue story generation as a background task. Returns 202 immediately."""
 
@@ -108,7 +108,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
     async def update_draft(
         story_id: str,
         body: UpdateDraftRequest,
-        _user: AuthenticatedUser = Depends(get_current_user),
+        _user: AuthenticatedUser = Depends(require_creator),
     ):
         """Edit a draft story's text/metadata before publishing."""
 
@@ -141,7 +141,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
     @router.post("/stories/{story_id}/publish", status_code=202)
     async def publish_story(
         story_id: str,
-        _user: AuthenticatedUser = Depends(get_current_user),
+        _user: AuthenticatedUser = Depends(require_creator),
     ):
         """Enqueue story publishing as a background task. Returns 202 immediately."""
 
@@ -184,7 +184,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
     @router.get("/stories/{story_id}/status")
     async def get_story_status(
         story_id: str,
-        _user: AuthenticatedUser = Depends(get_current_user),
+        _user: AuthenticatedUser = Depends(require_creator),
     ):
         """Poll for generate/publish progress."""
         story = await repos.stories.find_by_id_any(story_id)

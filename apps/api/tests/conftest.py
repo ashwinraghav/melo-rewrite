@@ -82,9 +82,16 @@ def _strict_async():
         yield
 
 
-def auth(uid: str, email: str | None = None) -> dict:
-    """Return headers that simulate an authenticated user (no Firebase needed)."""
+def auth(uid: str, email: str | None = None, creator: bool = True) -> dict:
+    """Return headers that simulate an authenticated user (no Firebase needed).
+
+    Args:
+        creator: Whether the user has creator access. Defaults to True for
+            backward compatibility with existing tests.
+    """
     headers = {"x-test-uid": uid}
     if email:
         headers["x-test-email"] = email
+    if not creator:
+        headers["x-test-creator"] = "false"
     return headers

@@ -1,18 +1,22 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useQuery } from '@tanstack/react-query'
 import { useAuthContext } from '@/context/auth-context'
+import { useApiClient } from '@/hooks/useApiClient'
 import { cn } from '@/lib/cn'
 import { Icon } from './icon'
 import { trackSignOut } from '@/lib/analytics'
+import type { UserProfile, ApiResponse } from '@mello/types'
 
-const TABS = [
+const BASE_TABS = [
   { href: '/discover', label: 'Home', icon: 'auto_stories' },
   { href: '/search', label: 'Search', icon: 'search' },
-  { href: '/create', label: 'Create', icon: 'edit_note' },
 ]
+
+const CREATE_TAB = { href: '/create', label: 'Create', icon: 'edit_note' }
 
 const MENU_ITEMS = [
   { href: '/voices', label: 'Voices', icon: 'record_voice_over' },
@@ -23,8 +27,20 @@ const MENU_ITEMS = [
 export function BottomNav() {
   const pathname = usePathname()
   const { user, signOut } = useAuthContext()
+  const client = useApiClient()
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  const { data: profileResponse } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => client.get<UserProfile>('/v1/me'),
+    enabled: !!user,
+  })
+  const profile = (profileResponse as ApiResponse<UserProfile> | undefined)?.data
+  const tabs = useMemo(
+    () => (profile?.isCreator ? [...BASE_TABS, CREATE_TAB] : BASE_TABS),
+    [profile?.isCreator],
+  )
 
   // Hide on the player page — it's a full-screen experience
   if (pathname.startsWith('/player')) return null
@@ -41,7 +57,7 @@ export function BottomNav() {
       className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around bg-surface-container-highest/60 backdrop-blur-[12px] pb-safe pt-2"
       aria-label="Main navigation"
     >
-      {TABS.map((tab) => {
+      {tabs.map((tab) => {
         const isActive = pathname.startsWith(tab.href)
         return (
           <Link
