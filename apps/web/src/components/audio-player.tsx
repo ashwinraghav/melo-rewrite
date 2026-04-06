@@ -200,7 +200,7 @@ export function AudioPlayer({
         <span>{formatTime(currentTime)}</span>
         <button
           onClick={cycleSpeed}
-          className="rounded-full bg-surface-container-high/60 px-2.5 py-0.5 font-medium transition-all hover:bg-surface-container-highest/60 active:scale-95"
+          className="rounded-full bg-secondary-container px-3 py-1 text-sm font-semibold text-on-secondary-container transition-all hover:brightness-110 active:scale-95"
           aria-label={`Playback speed: ${speed}x`}
         >
           {speed}x
