@@ -30,19 +30,43 @@ the authoritative source** for API enforcement.
 
 ### Granting / Revoking Access
 
-Use the admin script to manage creator access:
+**Prerequisites:** The user must have signed in at least once (so their
+Firebase Auth account and Firestore profile exist). You need Application
+Default Credentials configured for the `melo-f5756` project — either run on a
+machine with `gcloud auth application-default login` or use the API service
+account.
+
+**Grant creator access:**
 
 ```bash
-# Grant
-python scripts/set-creator.py --email parent@example.com --grant
+cd apps/api
+source .venv/bin/activate
+python scripts/set-creator.py --email user@example.com --grant
+```
 
-# Revoke
+**Revoke creator access:**
+
+```bash
+python scripts/set-creator.py --email user@example.com --revoke
+# or by UID:
 python scripts/set-creator.py --uid abc123 --revoke
 ```
 
-The script sets both the Firebase custom claim and the Firestore `isCreator`
-field in a single operation. The user must re-authenticate for the token change
-to take effect.
+**What the script does:**
+
+1. Resolves the email to a Firebase UID (if `--email` is used)
+2. Sets the `creator` custom claim on the Firebase Auth account via
+   `auth.set_custom_user_claims()` — this is what the API checks in the ID token
+3. Updates the Firestore `users/{uid}.isCreator` field — this is what the
+   frontend reads from the profile endpoint
+
+**After running the script:**
+
+The user must sign out and back in for the change to take effect in their
+browser. Firebase ID tokens are cached for up to 1 hour — signing out forces a
+fresh token with the updated custom claim. Once re-authenticated, the Create
+tab will appear (or disappear, if revoked) and API calls will be
+permitted (or blocked).
 
 ### API Enforcement
 
@@ -231,6 +255,21 @@ Start the publishing pipeline. Returns `202` immediately.
 If a publish is already in progress and less than 5 minutes old, returns `409`.
 If stale (>5 min), allows retry.
 
+### DELETE /v1/creator/stories/:id
+
+Delete any story. This is an **admin action** — creators can delete any story,
+not just ones they own. No ownership check is performed.
+
+Deletes the Firestore document and associated Cloud Storage files (audio, cover
+art, thumbnail). Orphaned favorites and history entries across other users are
+left in place — the frontend handles 404s gracefully.
+
+After deletion, the search index is invalidated and the catalog JSON files are
+regenerated.
+
+**Response:** `204 No Content`
+**Errors:** `403` (not a creator), `404` (story not found)
+
 ## Architecture
 
 ### Generation Pipeline
@@ -373,6 +412,7 @@ Returns 768-dimensional vector for semantic search.
 |-----------|------|---------|
 | CreateContent | `app/(app)/create/create-content.tsx` | Full create flow state machine |
 | BottomNav | `components/bottom-nav.tsx` | Conditionally shows Create tab |
+| PlayerContent | `app/(app)/player/player-content.tsx` | Delete button for creators (any story) |
 
 ### Create Page State Machine
 
@@ -428,9 +468,10 @@ The publish pipeline creates named spans for each step:
 
 ## Testing
 
-- 25 API tests in `tests/test_creator.py` covering auth enforcement, creator
+- 30 API tests in `tests/test_creator.py` covering auth enforcement, creator
   access gate (403 for non-creators), generation, draft editing, publishing,
-  age validation, source field, segments, embeddings, and catalog visibility
+  deletion (including admin delete of any story), age validation, source field,
+  segments, embeddings, and catalog visibility
 - Mock implementations (`MockStoryGenerator`, `MockAudioPublisher`,
   `MockCoverGenerator`, `MockEmbeddingService`) enable testing without external
   API credentials

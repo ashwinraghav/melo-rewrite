@@ -33,7 +33,7 @@ resource "google_storage_bucket" "stories" {
   }
 
   cors {
-    origin          = ["*"]
+    origin          = ["https://melostories.com", "https://www.melostories.com", "https://melobooks.com", "https://www.melobooks.com", "https://melo-f5756.web.app"]
     method          = ["GET", "HEAD"]
     response_header = ["Content-Type", "Content-Length", "Accept-Ranges"]
     max_age_seconds = 3600
@@ -70,7 +70,7 @@ resource "google_storage_bucket" "firebase_storage" {
   # Required for signed URL audio playback from the web app.
   # Without CORS, browsers block cross-origin <audio> range requests.
   cors {
-    origin          = ["*"]
+    origin          = ["https://melostories.com", "https://www.melostories.com", "https://melobooks.com", "https://www.melobooks.com", "https://melo-f5756.web.app"]
     method          = ["GET", "HEAD"]
     response_header = ["Content-Type", "Content-Length", "Accept-Ranges"]
     max_age_seconds = 3600

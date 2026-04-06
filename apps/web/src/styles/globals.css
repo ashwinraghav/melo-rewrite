@@ -12,8 +12,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Lexend:wght@300;400;500&display=swap');
-
 /* Prevent icon-name text flash while Material Symbols font loads */
 .material-symbols-rounded {
   overflow: hidden;

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { motion } from 'framer-motion'
 import { useAuthContext } from '@/context/auth-context'
 import { useApiClient } from '@/hooks/useApiClient'
@@ -73,7 +74,7 @@ export default function SignInPage() {
       >
         {/* Logo — full wordmark as the hero brand moment */}
         <div className="mb-4 flex justify-center">
-          <img src="/logo.png" alt="Melo" className="h-20 w-auto opacity-90" />
+          <Image src="/logo.png" alt="Melo" width={480} height={320} priority className="h-20 w-auto opacity-90" />
         </div>
 
         <div className="mb-10" />

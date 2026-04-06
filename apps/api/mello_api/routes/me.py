@@ -1,10 +1,16 @@
 from __future__ import annotations
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from ..middleware.auth import get_current_user, AuthenticatedUser
 from ..repositories.interfaces import Repositories
 from ..models.user import UserProfile, UpdateProfileBody, AcceptTermsBody, CURRENT_TERMS_VERSION
 from ..models.story import Story, StoryWithAudioUrl, categorize_duration
+
+
+class RecordProgressBody(BaseModel):
+    progressSeconds: int = Field(ge=0, le=86400)
+    completed: bool = False
 
 
 def _now() -> str:
@@ -31,6 +37,7 @@ def make_router(repos: Repositories) -> APIRouter:
         return profile
 
     async def _resolve_story_urls(story: Story) -> StoryWithAudioUrl:
+        thumb_path = story.cover_art_path.replace("/cover.webp", "/thumb.webp") if story.cover_art_path else ""
         return StoryWithAudioUrl(
             id=story.id,
             title=story.title,
@@ -40,8 +47,9 @@ def make_router(repos: Repositories) -> APIRouter:
             age_min=story.age_min,
             age_max=story.age_max,
             topics=story.topics,
-            audio_url=await repos.stories.get_audio_signed_url(story.id, story.audio_path),
-            cover_art_url=await repos.stories.get_cover_art_signed_url(story.id, story.cover_art_path),
+            audio_url=await repos.stories.get_audio_public_url(story.audio_path),
+            cover_art_url=await repos.stories.get_cover_art_public_url(story.cover_art_path),
+            cover_art_thumb_url=await repos.stories.get_cover_art_public_url(thumb_path) if thumb_path else "",
             is_published=story.is_published,
             created_at=story.created_at,
             updated_at=story.updated_at,
@@ -100,20 +108,14 @@ def make_router(repos: Repositories) -> APIRouter:
     @router.post("/history/{story_id}", status_code=201)
     async def record_progress(
         story_id: str,
-        body: dict,
+        body: RecordProgressBody,
         user: AuthenticatedUser = Depends(get_current_user),
     ):
         story = await repos.stories.find_by_id(story_id)
         if story is None:
             raise HTTPException(status_code=404, detail="Story not found")
 
-        progress_seconds = body.get("progressSeconds")
-        completed = body.get("completed", False)
-
-        if not isinstance(progress_seconds, (int, float)) or progress_seconds < 0:
-            raise HTTPException(status_code=400, detail="progressSeconds must be a non-negative number")
-
-        entry = await repos.history.upsert(user.uid, story_id, int(progress_seconds), bool(completed))
+        entry = await repos.history.upsert(user.uid, story_id, body.progressSeconds, body.completed)
         return {"data": entry.model_dump(by_alias=True)}
 
     return router

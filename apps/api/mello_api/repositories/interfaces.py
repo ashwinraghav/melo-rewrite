@@ -53,6 +53,9 @@ class StoryRepository(ABC):
     @abstractmethod
     async def get_audio_public_url(self, audio_path: str) -> str: ...
 
+    @abstractmethod
+    async def delete(self, story_id: str) -> None: ...
+
 
 class UserRepository(ABC):
     @abstractmethod

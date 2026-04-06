@@ -16,9 +16,13 @@ WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
+RUN adduser --disabled-password --no-create-home --gecos "" appuser
+
 COPY apps/api/mello_api ./mello_api
 
 ENV PORT=8080
 EXPOSE 8080
+
+USER appuser
 
 CMD ["uvicorn", "mello_api.asgi:app", "--host", "0.0.0.0", "--port", "8080"]

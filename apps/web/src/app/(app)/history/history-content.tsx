@@ -129,7 +129,7 @@ export function HistoryContent() {
               <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl bg-surface-container-high">
                 {story?.coverArtUrl ? (
                   <img
-                    src={story.coverArtUrl}
+                    src={story.coverArtThumbUrl || story.coverArtUrl}
                     alt=""
                     className="h-full w-full object-cover"
                     loading="lazy"

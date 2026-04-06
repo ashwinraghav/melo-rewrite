@@ -402,3 +402,72 @@ def test_generate_toddler_tier(creator_client, repos):
     assert story.title == "The Sleepy Bunny"
     assert story.age_min == 1
     assert story.age_max == 3
+
+
+# ── Delete ────────────────────────────────────────────────────────────────
+
+def test_delete_requires_auth(creator_client):
+    """DELETE /v1/creator/stories/{id} must require authentication."""
+    resp = creator_client.delete("/v1/creator/stories/fake-id")
+    assert resp.status_code == 401
+
+
+def test_delete_requires_creator(creator_client):
+    """Non-creator users get 403 on delete."""
+    resp = creator_client.delete(
+        "/v1/creator/stories/fake-id",
+        headers=auth(TEST_UID, creator=False),
+    )
+    assert resp.status_code == 403
+
+
+def test_delete_story(creator_client, repos):
+    """Creator can delete a published story they created."""
+    gen_resp = creator_client.post(
+        "/v1/creator/generate",
+        json={"prompt": "test", "age": 4},
+        headers=auth(TEST_UID),
+    )
+    story_id = gen_resp.json()["data"]["id"]
+
+    # Publish it first
+    creator_client.post(
+        f"/v1/creator/stories/{story_id}/publish",
+        headers=auth(TEST_UID),
+    )
+    assert asyncio.run(repos.stories.find_by_id(story_id)) is not None
+
+    # Delete it
+    resp = creator_client.delete(
+        f"/v1/creator/stories/{story_id}",
+        headers=auth(TEST_UID),
+    )
+    assert resp.status_code == 204
+
+    # Verify it's gone
+    assert asyncio.run(repos.stories.find_by_id(story_id)) is None
+    assert asyncio.run(repos.stories.find_by_id_any(story_id)) is None
+
+
+def test_delete_story_not_found(creator_client):
+    """Deleting a nonexistent story returns 404."""
+    resp = creator_client.delete(
+        "/v1/creator/stories/nonexistent",
+        headers=auth(TEST_UID),
+    )
+    assert resp.status_code == 404
+
+
+def test_delete_any_story(creator_client, repos):
+    """Creators can delete any story, not just ones they own (admin action)."""
+    # The fixture seeds curated stories — delete one
+    curated = asyncio.run(repos.stories.find_by_id("the-whispering-pines"))
+    assert curated is not None
+    assert curated.owner_uid == ""  # Not owned by anyone
+
+    resp = creator_client.delete(
+        "/v1/creator/stories/the-whispering-pines",
+        headers=auth(TEST_UID),
+    )
+    assert resp.status_code == 204
+    assert asyncio.run(repos.stories.find_by_id("the-whispering-pines")) is None

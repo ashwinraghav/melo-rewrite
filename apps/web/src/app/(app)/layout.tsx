@@ -29,7 +29,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const client = useApiClient()
-  const [termsAccepted, setTermsAccepted] = useState(false)
+  const [termsJustAccepted, setTermsJustAccepted] = useState(false)
 
   const isPlayer = pathname.startsWith('/player')
 
@@ -43,15 +43,13 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!loading && !user) router.replace('/sign-in')
-  }, [user, loading, router])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- router is unstable; redirect depends only on auth state
+  }, [user, loading])
 
-  // Check if the user has accepted the current terms version
-  const profileTermsVersion = profile?.termsVersion
-  useEffect(() => {
-    if (profileTermsVersion === CURRENT_TERMS_VERSION) {
-      setTermsAccepted(true)
-    }
-  }, [profileTermsVersion])
+  // Derive terms acceptance from profile data — no useEffect needed.
+  // termsJustAccepted covers the case where user accepts terms in this session
+  // (before the profile query refetches with the updated version).
+  const termsAccepted = termsJustAccepted || profile?.termsVersion === CURRENT_TERMS_VERSION
 
   // Show nothing while auth is loading (need to know if user exists for protected routes)
   if (loading) {
@@ -60,7 +58,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   // Show terms gate only after profile has loaded and we know terms are stale
   if (user && !profileLoading && !termsAccepted) {
-    return <TermsGate onAccepted={() => setTermsAccepted(true)} />
+    return <TermsGate onAccepted={() => setTermsJustAccepted(true)} />
   }
 
   return (

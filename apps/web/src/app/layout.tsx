@@ -37,7 +37,6 @@ export const viewport: Viewport = {
   themeColor: '#060e20',
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -49,10 +48,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://cdn.melostories.com" />
         <link rel="preconnect" href="https://mello-api-rhp2tqs5qa-uc.a.run.app" />
+        {/* Firebase Auth token refresh/validation — warm connections before SDK needs them */}
+        <link rel="preconnect" href="https://securetoken.googleapis.com" />
+        <link rel="preconnect" href="https://identitytoolkit.googleapis.com" />
         {/* Material Symbols Rounded — used throughout the Stitch Editorial Serenity design */}
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=block"
         />
       </head>
       <body>

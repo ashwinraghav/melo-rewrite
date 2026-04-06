@@ -48,7 +48,7 @@ def set_creator(uid: str, *, grant: bool) -> None:
     doc_ref = db.collection("users").document(uid)
     doc = doc_ref.get()
     if doc.exists:
-        doc_ref.update({"is_creator": grant})
+        doc_ref.update({"isCreator": grant})
         print(f"Firestore users/{uid}.is_creator updated to {grant}")
     else:
         print(f"Warning: No Firestore profile found for uid {uid} (user may not have signed in yet)")

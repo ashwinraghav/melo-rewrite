@@ -23,10 +23,12 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
     async def _resolve_story_urls(story: Story) -> StoryWithAudioUrl:
         audio_url = ""
         cover_art_url = ""
+        thumb_path = ""
         if story.audio_path:
-            audio_url = await repos.stories.get_audio_signed_url(story.id, story.audio_path)
+            audio_url = await repos.stories.get_audio_public_url(story.audio_path)
         if story.cover_art_path:
-            cover_art_url = await repos.stories.get_cover_art_signed_url(story.id, story.cover_art_path)
+            cover_art_url = await repos.stories.get_cover_art_public_url(story.cover_art_path)
+            thumb_path = story.cover_art_path.replace("/cover.webp", "/thumb.webp")
         return StoryWithAudioUrl(
             id=story.id,
             title=story.title,
@@ -38,6 +40,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
             topics=story.topics,
             audio_url=audio_url,
             cover_art_url=cover_art_url,
+            cover_art_thumb_url=await repos.stories.get_cover_art_public_url(thumb_path) if thumb_path else "",
             source=story.source,
             is_published=story.is_published,
             created_at=story.created_at,

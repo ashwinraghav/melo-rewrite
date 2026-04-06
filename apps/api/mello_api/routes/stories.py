@@ -10,6 +10,8 @@ def make_router(repos: Repositories) -> APIRouter:
     router = APIRouter(prefix="/v1")
 
     async def resolve_story_urls(story: Story, include_text: bool = False) -> StoryWithAudioUrl:
+        # Derive thumb path from cover path: stories/{id}/cover.webp → stories/{id}/thumb.webp
+        thumb_path = story.cover_art_path.replace("/cover.webp", "/thumb.webp") if story.cover_art_path else ""
         return StoryWithAudioUrl(
             id=story.id,
             title=story.title,
@@ -21,6 +23,7 @@ def make_router(repos: Repositories) -> APIRouter:
             topics=story.topics,
             audio_url=await repos.stories.get_audio_public_url(story.audio_path),
             cover_art_url=await repos.stories.get_cover_art_public_url(story.cover_art_path),
+            cover_art_thumb_url=await repos.stories.get_cover_art_public_url(thumb_path) if thumb_path else "",
             story_text=story.story_text if include_text else None,
             segments=story.segments if include_text else None,
             source=story.source,
@@ -31,13 +34,14 @@ def make_router(repos: Repositories) -> APIRouter:
 
     @router.get("/stories")
     async def list_stories(
-        topics: Optional[str] = Query(default=None),
+        topics: Optional[str] = Query(default=None, max_length=200),
         child_age: Optional[int] = Query(default=None, ge=1, le=12, alias="childAge"),
         duration: Optional[StoryDuration] = Query(default=None),
         _user: AuthenticatedUser = Depends(get_current_user),
     ):
+        topic_list = [t.strip().lower() for t in topics.split(",")][:20] if topics else None
         filters = StoryFilters(
-            topics=[t.strip().lower() for t in topics.split(",")] if topics else None,
+            topics=topic_list,
             child_age=child_age,
             duration=duration,
         )

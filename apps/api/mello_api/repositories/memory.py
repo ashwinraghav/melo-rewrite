@@ -91,6 +91,9 @@ class MemoryStoryRepository(StoryRepository):
     async def get_audio_public_url(self, audio_path: str) -> str:
         return f"https://storage.googleapis.com/test-bucket/{audio_path}"
 
+    async def delete(self, story_id: str) -> None:
+        self._stories.pop(story_id, None)
+
 
 class MemoryUserRepository(UserRepository):
     def __init__(self) -> None:

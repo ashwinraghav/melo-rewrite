@@ -54,6 +54,7 @@ def _story_from_doc(doc_id: str, data: dict) -> Story:
         segments=segments,
         themes=data.get("themes", ""),
         embedding=data.get("embedding", []),
+        owner_uid=data.get("ownerUid", ""),
         source=data.get("source", "curated"),
         generate_status=data.get("generateStatus", "idle"),
         generate_error=data.get("generateError", ""),
@@ -108,6 +109,7 @@ class FirestoreStoryRepository(StoryRepository):
             "topics": story.topics,
             "audioPath": story.audio_path,
             "coverArtPath": story.cover_art_path,
+            "ownerUid": story.owner_uid,
             "storyText": story.story_text,
             "segments": [
                 {"text": s.text, "startTime": s.start_time, "endTime": s.end_time}
@@ -128,22 +130,25 @@ class FirestoreStoryRepository(StoryRepository):
         await self._db.collection("stories").document(story.id).set(doc_data)
         return story
 
+    # Snake→camelCase mapping for update(). Exposed as class attr for testing.
+    FIELD_MAP = {
+        "owner_uid": "ownerUid",
+        "duration_seconds": "durationSeconds",
+        "duration_category": "durationCategory",
+        "age_min": "ageMin",
+        "age_max": "ageMax",
+        "audio_path": "audioPath",
+        "cover_art_path": "coverArtPath",
+        "story_text": "storyText",
+        "is_published": "isPublished",
+        "generate_status": "generateStatus",
+        "generate_error": "generateError",
+        "publish_status": "publishStatus",
+        "publish_step": "publishStep",
+        "publish_error": "publishError",
+    }
+
     async def update(self, story_id: str, data: dict) -> Story | None:
-        field_map = {
-            "duration_seconds": "durationSeconds",
-            "duration_category": "durationCategory",
-            "age_min": "ageMin",
-            "age_max": "ageMax",
-            "audio_path": "audioPath",
-            "cover_art_path": "coverArtPath",
-            "story_text": "storyText",
-            "is_published": "isPublished",
-            "generate_status": "generateStatus",
-            "generate_error": "generateError",
-            "publish_status": "publishStatus",
-            "publish_step": "publishStep",
-            "publish_error": "publishError",
-        }
         firestore_data: dict = {}
         for k, v in data.items():
             if k == "segments":
@@ -154,7 +159,7 @@ class FirestoreStoryRepository(StoryRepository):
             elif k == "embedding":
                 firestore_data["embedding"] = Vector(v) if v else []
             else:
-                firestore_data[field_map.get(k, k)] = v
+                firestore_data[self.FIELD_MAP.get(k, k)] = v
         firestore_data["updatedAt"] = _now()
         await self._db.collection("stories").document(story_id).update(firestore_data)
         return await self.find_by_id_any(story_id)
@@ -264,6 +269,42 @@ class FirestoreStoryRepository(StoryRepository):
     async def get_audio_public_url(self, audio_path: str) -> str:
         return f"https://cdn.melostories.com/{audio_path}"
 
+    async def delete(self, story_id: str) -> None:
+        """Delete story document and associated Cloud Storage files."""
+        doc_ref = self._db.collection("stories").document(story_id)
+        doc = await doc_ref.get()
+        if not doc.exists:
+            return
+
+        data = doc.to_dict()
+
+        # Collect GCS paths to delete (audio, cover art, thumbnail)
+        paths_to_delete: list[str] = []
+        audio_path = data.get("audioPath", "")
+        cover_path = data.get("coverArtPath", "")
+        if audio_path:
+            paths_to_delete.append(audio_path)
+        if cover_path:
+            paths_to_delete.append(cover_path)
+            # Thumbnail is stored alongside cover art
+            thumb_path = cover_path.rsplit("/", 1)
+            if len(thumb_path) == 2:
+                paths_to_delete.append(f"{thumb_path[0]}/thumb.webp")
+
+        # Delete GCS files in parallel — ignore errors (files may not exist)
+        async def _delete_blob(path: str) -> None:
+            try:
+                bucket = self._gcs_client.bucket(self._bucket_name)
+                await asyncio.to_thread(bucket.blob(path).delete)
+            except Exception:
+                pass  # File may not exist (e.g. unpublished draft)
+
+        if paths_to_delete:
+            await asyncio.gather(*[_delete_blob(p) for p in paths_to_delete])
+
+        # Delete Firestore document
+        await doc_ref.delete()
+
 
 class FirestoreUserRepository(UserRepository):
     def __init__(self, db: "AsyncClient") -> None:
@@ -305,16 +346,18 @@ class FirestoreUserRepository(UserRepository):
         await self._ref(profile.uid).set(data)
         return profile
 
+    # Snake→camelCase mapping for update(). Exposed as class attr for testing.
+    FIELD_MAP = {
+        "child_age": "childAge",
+        "preferred_topics": "preferredTopics",
+        "display_name": "displayName",
+        "is_creator": "isCreator",
+        "terms_version": "termsVersion",
+        "terms_accepted_at": "termsAcceptedAt",
+    }
+
     async def update(self, uid: str, data: dict) -> UserProfile:
-        # Map Python snake_case keys to Firestore camelCase
-        field_map = {
-            "child_age": "childAge",
-            "preferred_topics": "preferredTopics",
-            "display_name": "displayName",
-            "terms_version": "termsVersion",
-            "terms_accepted_at": "termsAcceptedAt",
-        }
-        firestore_data = {field_map.get(k, k): v for k, v in data.items()}
+        firestore_data = {self.FIELD_MAP.get(k, k): v for k, v in data.items()}
         firestore_data["updatedAt"] = _now()
         await self._ref(uid).update(firestore_data)
         profile = await self.find_by_id(uid)
@@ -439,13 +482,15 @@ class FirestoreVoiceRepository(VoiceRepository):
         })
         return voice
 
+    # Snake→camelCase mapping for update(). Exposed as class attr for testing.
+    FIELD_MAP = {
+        "eleven_labs_voice_id": "elevenLabsVoiceId",
+        "sample_audio_path": "sampleAudioPath",
+        "created_at": "createdAt",
+    }
+
     async def update(self, uid: str, voice_id: str, data: dict) -> Voice | None:
-        field_map = {
-            "eleven_labs_voice_id": "elevenLabsVoiceId",
-            "sample_audio_path": "sampleAudioPath",
-            "created_at": "createdAt",
-        }
-        firestore_data = {field_map.get(k, k): v for k, v in data.items()}
+        firestore_data = {self.FIELD_MAP.get(k, k): v for k, v in data.items()}
         await self._ref(uid, voice_id).update(firestore_data)
         return await self.find_by_id(uid, voice_id)
 
@@ -552,16 +597,18 @@ class FirestoreConversionRepository(ConversionRepository):
         })
         return conversion
 
+    # Snake→camelCase mapping for update(). Exposed as class attr for testing.
+    FIELD_MAP = {
+        "story_id": "storyId",
+        "voice_id": "voiceId",
+        "audio_path": "audioPath",
+        "duration_seconds": "durationSeconds",
+        "created_at": "createdAt",
+        "updated_at": "updatedAt",
+    }
+
     async def update(self, uid: str, story_id: str, voice_id: str, data: dict) -> Conversion | None:
-        field_map = {
-            "story_id": "storyId",
-            "voice_id": "voiceId",
-            "audio_path": "audioPath",
-            "duration_seconds": "durationSeconds",
-            "created_at": "createdAt",
-            "updated_at": "updatedAt",
-        }
-        firestore_data = {field_map.get(k, k): v for k, v in data.items()}
+        firestore_data = {self.FIELD_MAP.get(k, k): v for k, v in data.items()}
         firestore_data["updatedAt"] = _now()
         await self._ref(uid, story_id, voice_id).update(firestore_data)
         return await self.find_by_id(uid, story_id, voice_id)

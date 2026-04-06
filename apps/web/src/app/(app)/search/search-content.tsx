@@ -235,7 +235,7 @@ export function SearchContent() {
                 >
                   <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl bg-surface-container-high">
                     {story.coverArtUrl ? (
-                      <img src={story.coverArtUrl} alt="" className="h-full w-full object-cover" />
+                      <img src={story.coverArtThumbUrl || story.coverArtUrl} alt="" className="h-full w-full object-cover" />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
                         <Icon name="auto_stories" size={20} className="text-on-surface-variant/30" />

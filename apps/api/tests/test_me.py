@@ -1,4 +1,5 @@
 """Profile endpoint tests."""
+import asyncio
 import pytest
 from tests.conftest import auth
 from tests.fixtures import USER_ALICE, USER_BOB
@@ -104,3 +105,43 @@ def test_new_profile_has_null_terms(client):
     data = r.json()["data"]
     assert data["termsVersion"] is None
     assert data["termsAcceptedAt"] is None
+
+
+# ── Creator flag ──────────────────────────────────────────────────────────
+
+def test_new_profile_defaults_to_non_creator(client):
+    """New profiles should have isCreator: false in the API response."""
+    r = client.get("/v1/me", headers=auth(USER_ALICE))
+    assert r.status_code == 200
+    assert r.json()["data"]["isCreator"] is False
+
+
+def test_creator_flag_round_trips_through_api(client, repos):
+    """Setting is_creator via the repo should be visible in GET /v1/me.
+
+    This catches field naming mismatches (e.g. snake_case 'is_creator'
+    vs camelCase 'isCreator' in Firestore) that would cause the flag
+    to silently default to false on read.
+    """
+    # Create profile
+    client.get("/v1/me", headers=auth(USER_ALICE))
+
+    # Set creator via repository (simulates what set-creator.py does)
+    asyncio.run(repos.users.update(USER_ALICE, {"is_creator": True}))
+
+    # Verify the API returns isCreator: true
+    r = client.get("/v1/me", headers=auth(USER_ALICE))
+    assert r.json()["data"]["isCreator"] is True
+
+
+def test_creator_flag_persists_across_profile_updates(client, repos):
+    """Updating other profile fields must not reset isCreator."""
+    client.get("/v1/me", headers=auth(USER_ALICE))
+    asyncio.run(repos.users.update(USER_ALICE, {"is_creator": True}))
+
+    # Update an unrelated field
+    client.patch("/v1/me", json={"childAge": 3}, headers=auth(USER_ALICE))
+
+    # isCreator should still be true
+    r = client.get("/v1/me", headers=auth(USER_ALICE))
+    assert r.json()["data"]["isCreator"] is True

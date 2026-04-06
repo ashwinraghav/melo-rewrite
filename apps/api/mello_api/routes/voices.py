@@ -204,6 +204,9 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
 
         audio_bytes = await audio.read()
 
+        MAX_RECORDING_BYTES = 10_000_000  # 10 MB
+        if len(audio_bytes) > MAX_RECORDING_BYTES:
+            raise HTTPException(status_code=413, detail="Recording too large. Maximum size is 10 MB.")
         if len(audio_bytes) < MIN_RECORDING_BYTES:
             raise HTTPException(
                 status_code=400,

@@ -25,9 +25,9 @@ from pathlib import Path
 
 import requests
 
-ELEVENLABS_API_KEY = os.environ.get(
-    "ELEVENLABS_API_KEY", "sk_87836d9e23e20251146364c78190ec28638e6ef1f5b7dc7f"
-)
+ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY")
+if not ELEVENLABS_API_KEY:
+    raise SystemExit("ELEVENLABS_API_KEY environment variable is required")
 API_BASE = "https://api.elevenlabs.io/v1"
 OUTPUT_DIR = Path(__file__).parent / "stories-output"
 

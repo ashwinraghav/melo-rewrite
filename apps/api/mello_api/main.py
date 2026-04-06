@@ -52,8 +52,8 @@ def create_app(
         CORSMiddleware,
         allow_origins=cors_origins or ["http://localhost:3000"],
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
     )
 
     app.include_router(health_router)

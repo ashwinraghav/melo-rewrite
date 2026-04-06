@@ -45,7 +45,7 @@ def test_upsert_overwrites_previous_entry(client):
 def test_negative_progress_seconds_rejected(client):
     _setup_alice(client)
     r = client.post("/v1/me/history/the-whispering-pines", json={"progressSeconds": -1, "completed": False}, headers=auth(USER_ALICE))
-    assert r.status_code == 400
+    assert r.status_code == 422
 
 
 def test_history_404_for_unknown_story(client):

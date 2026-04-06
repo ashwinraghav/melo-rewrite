@@ -15,7 +15,7 @@ Sentry.init({
 
   environment: process.env['NEXT_PUBLIC_SENTRY_ENVIRONMENT'] ?? 'production',
 
-  sendDefaultPii: true,
+  sendDefaultPii: false,
 
   // Capture 10% of transactions for performance monitoring.
   tracesSampleRate: process.env.NODE_ENV === 'development' ? 1.0 : 0.1,

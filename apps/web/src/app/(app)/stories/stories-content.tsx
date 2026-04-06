@@ -160,7 +160,7 @@ export function StoriesContent() {
             <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-xl bg-surface-container-high">
               {story.coverArtUrl ? (
                 <img
-                  src={story.coverArtUrl}
+                  src={story.coverArtThumbUrl || story.coverArtUrl}
                   alt=""
                   className="h-full w-full object-cover"
                   loading="lazy"
@@ -175,9 +175,9 @@ export function StoriesContent() {
             {/* Info */}
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <h3 className="truncate font-display text-[0.95rem] font-medium text-on-surface">
+                <h2 className="truncate font-display text-[0.95rem] font-medium text-on-surface">
                   {story.title}
-                </h3>
+                </h2>
                 {story.source === 'user' && (
                   <span className="flex-shrink-0 rounded-full bg-tertiary/15 px-2 py-0.5 font-body text-[10px] font-medium text-tertiary">
                     Shar

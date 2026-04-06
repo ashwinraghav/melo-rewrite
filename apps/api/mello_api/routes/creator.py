@@ -19,6 +19,7 @@ from ..models.story import (
     GenerateStoryRequest,
     GenerateStoryResponse,
     Story,
+    StoryFilters,
     StoryWithAudioUrl,
     UpdateDraftRequest,
 )
@@ -213,5 +214,23 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
                 created_at=story.created_at,
             ).model_dump(by_alias=True)
         return {"data": result}
+
+    @router.delete("/stories/{story_id}", status_code=204)
+    async def delete_story(
+        story_id: str,
+        _user: AuthenticatedUser = Depends(require_creator),
+    ):
+        """Delete any story. Creator-only, no ownership check (admin action)."""
+
+        story = await repos.stories.find_by_id_any(story_id)
+        if story is None:
+            raise HTTPException(status_code=404, detail="Story not found")
+
+        await repos.stories.delete(story_id)
+
+        # Update search index and catalog
+        services.search.invalidate()
+        all_stories = await repos.stories.find_many(StoryFilters())
+        await services.catalog_publisher.publish_catalog(all_stories)
 
     return router

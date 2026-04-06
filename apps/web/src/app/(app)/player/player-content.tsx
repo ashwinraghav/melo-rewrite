@@ -12,6 +12,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useAuthContext } from '@/context/auth-context'
 import { useApiClient } from '@/hooks/useApiClient'
 import { AudioPlayer } from '@/components/audio-player'
 import { ReadAlong } from '@/components/read-along'
@@ -23,7 +24,7 @@ import {
   trackStoryPlay, trackStoryPause, trackStoryComplete, trackStoryProgress,
   trackSkipTrack, trackPersonalizeOpened, trackVoiceSelected,
 } from '@/lib/analytics'
-import type { StoryWithAudioUrl, PaginatedResponse, StorySegment } from '@mello/types'
+import type { UserProfile, ApiResponse, StoryWithAudioUrl, PaginatedResponse, StorySegment } from '@mello/types'
 import { COMPLETION_THRESHOLD } from '@mello/types'
 
 export function PlayerContent() {
@@ -31,8 +32,17 @@ export function PlayerContent() {
   const initialId = searchParams.get('id') ?? ''
   const topics = searchParams.get('topics') ?? ''
   const router = useRouter()
+  const { user } = useAuthContext()
   const client = useApiClient()
   const queryClient = useQueryClient()
+
+  // Creator profile — enables admin actions like delete
+  const { data: profileResponse } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => client.get<UserProfile>('/v1/me'),
+    enabled: !!user,
+  })
+  const isCreator = (profileResponse as ApiResponse<UserProfile> | undefined)?.data?.isCreator ?? false
 
   // Current track managed as state — no URL navigation on track change
   const [currentId, setCurrentId] = useState(initialId)
@@ -106,6 +116,21 @@ export function PlayerContent() {
     }
   }, [nextStory?.id, prevStory?.id, queryClient, client])
 
+  // Preload adjacent cover images so track switches feel instant
+  useEffect(() => {
+    const links: HTMLLinkElement[] = []
+    for (const s of [prevStory, nextStory]) {
+      if (!s?.coverArtUrl) continue
+      const link = document.createElement('link')
+      link.rel = 'preload'
+      link.as = 'image'
+      link.href = s.coverArtUrl
+      document.head.appendChild(link)
+      links.push(link)
+    }
+    return () => links.forEach((l) => l.remove())
+  }, [prevStory?.coverArtUrl, nextStory?.coverArtUrl])
+
   // Keep URL in sync for deep-linking without triggering re-render
   useEffect(() => {
     const url = `/player?id=${currentId}${topics ? `&topics=${topics}` : ''}`
@@ -131,6 +156,22 @@ export function PlayerContent() {
     },
     [story, currentId, recordProgress]
   )
+
+  // Delete story (creator-only admin action)
+  const deleteMutation = useMutation({
+    mutationFn: (storyId: string) => client.delete(`/v1/creator/stories/${storyId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['stories'] })
+      router.back()
+    },
+  })
+
+  const handleDelete = useCallback(() => {
+    if (!story) return
+    if (confirm(`Delete "${story.title}"? This cannot be undone.`)) {
+      deleteMutation.mutate(currentId)
+    }
+  }, [story, currentId, deleteMutation])
 
   // Switch track — state only, no router navigation
   const switchTrack = useCallback((storyId: string) => {
@@ -210,7 +251,18 @@ export function PlayerContent() {
           </span>
         )}
 
-        <div className="w-10" />
+        {isCreator ? (
+          <button
+            onClick={handleDelete}
+            disabled={deleteMutation.isPending}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-high/40 backdrop-blur-sm transition-all hover:bg-error/15"
+            aria-label="Delete story"
+          >
+            <Icon name="delete" size={20} className="text-on-surface-variant" />
+          </button>
+        ) : (
+          <div className="w-10" />
+        )}
       </div>
 
       {/* Story info — animates on track change, compacts after 3s */}
@@ -219,7 +271,7 @@ export function PlayerContent() {
           key={currentId}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
+          exit={{ opacity: 0 }}
           transition={{ duration: 0.25 }}
           className="px-6 pt-6"
         >

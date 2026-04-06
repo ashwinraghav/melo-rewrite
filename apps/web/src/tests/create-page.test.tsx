@@ -25,6 +25,16 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
+vi.mock('@/context/auth-context', () => ({
+  useAuthContext: () => ({
+    user: { uid: 'uid-1', email: 'test@test.com', displayName: 'Test' },
+    loading: false,
+    getIdToken: vi.fn(),
+    signInWithGoogle: vi.fn(),
+    signOut: vi.fn(),
+  }),
+}))
+
 const mockPost = vi.fn()
 const mockPatch = vi.fn()
 const mockGet = vi.fn()
@@ -118,23 +128,27 @@ const MOCK_PUBLISHED_STORY = {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+const MOCK_PROFILE = { data: { isCreator: true, termsVersion: '1.0' } }
+
 /** Set up mocks for the generate → review flow */
 function mockGenerateFlow() {
   mockPost.mockResolvedValueOnce(MOCK_GENERATE_ACCEPTED)
-  mockGet.mockResolvedValue(MOCK_STATUS_GENERATED)
+  // First call is profile query, subsequent calls are status polling
+  mockGet.mockResolvedValueOnce(MOCK_PROFILE).mockResolvedValue(MOCK_STATUS_GENERATED)
 }
 
 /** Set up mocks for the full generate → review → publish → success flow */
 function mockFullFlow() {
-  // Generate
   mockPost.mockResolvedValueOnce(MOCK_GENERATE_ACCEPTED)
-  mockGet.mockResolvedValue(MOCK_STATUS_GENERATED)
+  mockGet.mockResolvedValueOnce(MOCK_PROFILE).mockResolvedValue(MOCK_STATUS_GENERATED)
 }
 
 function triggerGenerate() {
   fireEvent.change(screen.getByPlaceholderText(/describe the story/i), {
     target: { value: 'test' },
   })
+  // Select an age group — required before Generate is enabled
+  fireEvent.click(screen.getByText('Toddler'))
   fireEvent.click(screen.getByRole('button', { name: /generate story/i }))
 }
 
@@ -149,6 +163,8 @@ async function waitForReview() {
 describe('CreatePage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Default: profile query returns accepted terms + creator flag
+    mockGet.mockResolvedValue({ data: { isCreator: true, termsVersion: '1.0' } })
   })
 
   // ── Prompt state ────────────────────────────────────────────────────
@@ -177,10 +193,11 @@ describe('CreatePage', () => {
     expect(button).toBeDisabled()
   })
 
-  it('enables Generate button when prompt has text', () => {
+  it('enables Generate button when prompt has text and age is selected', () => {
     renderWithQuery(<CreatePage />)
     const textarea = screen.getByPlaceholderText(/describe the story/i)
     fireEvent.change(textarea, { target: { value: 'A story about the moon' } })
+    fireEvent.click(screen.getByText('Toddler'))
     const button = screen.getByRole('button', { name: /generate story/i })
     expect(button).not.toBeDisabled()
   })
@@ -201,6 +218,7 @@ describe('CreatePage', () => {
     renderWithQuery(<CreatePage />)
     const textarea = screen.getByPlaceholderText(/describe the story/i)
     fireEvent.change(textarea, { target: { value: 'A bedtime story' } })
+    fireEvent.click(screen.getByText('Toddler'))
     fireEvent.click(screen.getByRole('button', { name: /generate story/i }))
 
     await waitFor(() => {
