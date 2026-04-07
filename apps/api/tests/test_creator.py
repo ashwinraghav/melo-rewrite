@@ -471,3 +471,64 @@ def test_delete_any_story(creator_client, repos):
     )
     assert resp.status_code == 204
     assert asyncio.run(repos.stories.find_by_id("the-whispering-pines")) is None
+
+
+# ── Narrator voice selection ────────────────────────────────────────────
+
+
+def test_publish_with_voice(creator_client, repos):
+    """Publish with a specific narrator voice succeeds."""
+    gen_resp = creator_client.post(
+        "/v1/creator/generate",
+        json={"prompt": "test", "age": 4},
+        headers=auth(TEST_UID),
+    )
+    story_id = gen_resp.json()["data"]["id"]
+
+    resp = creator_client.post(
+        f"/v1/creator/stories/{story_id}/publish",
+        json={"voice": "indian"},
+        headers=auth(TEST_UID),
+    )
+    assert resp.status_code == 202
+
+    story = asyncio.run(repos.stories.find_by_id(story_id))
+    assert story.is_published is True
+
+
+def test_publish_with_invalid_voice(creator_client, repos):
+    """Unknown voice key returns 400."""
+    gen_resp = creator_client.post(
+        "/v1/creator/generate",
+        json={"prompt": "test", "age": 4},
+        headers=auth(TEST_UID),
+    )
+    story_id = gen_resp.json()["data"]["id"]
+
+    resp = creator_client.post(
+        f"/v1/creator/stories/{story_id}/publish",
+        json={"voice": "martian"},
+        headers=auth(TEST_UID),
+    )
+    assert resp.status_code == 400
+    assert "martian" in resp.json()["detail"].lower()
+
+
+def test_publish_with_empty_body_uses_default(creator_client, repos):
+    """Empty JSON body defaults to british narrator."""
+    gen_resp = creator_client.post(
+        "/v1/creator/generate",
+        json={"prompt": "test", "age": 4},
+        headers=auth(TEST_UID),
+    )
+    story_id = gen_resp.json()["data"]["id"]
+
+    resp = creator_client.post(
+        f"/v1/creator/stories/{story_id}/publish",
+        json={},
+        headers=auth(TEST_UID),
+    )
+    assert resp.status_code == 202
+
+    story = asyncio.run(repos.stories.find_by_id(story_id))
+    assert story.is_published is True

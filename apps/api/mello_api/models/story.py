@@ -112,6 +112,10 @@ class UpdateDraftRequest(CamelModel):
     age_max: int | None = None
 
 
+class PublishStoryRequest(CamelModel):
+    voice: str | None = None
+
+
 class SearchStoriesRequest(CamelModel):
     query: str = Field(min_length=1, max_length=500)
     child_age: int | None = Field(default=None, ge=1, le=12)

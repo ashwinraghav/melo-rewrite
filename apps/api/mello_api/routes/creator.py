@@ -10,14 +10,16 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
 
 from ..middleware.auth import require_creator, AuthenticatedUser
+from ..config import NARRATOR_VOICES, DEFAULT_NARRATOR_VOICE
 from fastapi.responses import JSONResponse
 
 from ..models.story import (
     GenerateStoryRequest,
     GenerateStoryResponse,
+    PublishStoryRequest,
     Story,
     StoryFilters,
     StoryWithAudioUrl,
@@ -142,6 +144,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
     @router.post("/stories/{story_id}/publish", status_code=202)
     async def publish_story(
         story_id: str,
+        body: PublishStoryRequest = Body(default=PublishStoryRequest()),
         _user: AuthenticatedUser = Depends(require_creator),
     ):
         """Enqueue story publishing as a background task. Returns 202 immediately."""
@@ -153,6 +156,11 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
             raise HTTPException(status_code=403, detail="Not authorized")
         if story.is_published:
             raise HTTPException(status_code=400, detail="Story is already published")
+
+        # Resolve narrator voice
+        voice_key = body.voice or DEFAULT_NARRATOR_VOICE
+        if voice_key not in NARRATOR_VOICES:
+            raise HTTPException(status_code=400, detail=f"Unknown voice: {voice_key}")
 
         # If already processing, check if stale (>5 min) — allow retry if so
         if story.publish_status == "processing":
@@ -176,7 +184,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
 
         await services.task_queue.enqueue(
             "publish-story",
-            {"storyId": story_id},
+            {"storyId": story_id, "voiceId": NARRATOR_VOICES[voice_key]},
             dedup_id=story_id,
         )
 

@@ -17,7 +17,13 @@ import { useAuthContext } from '@/context/auth-context'
 import { useApiClient } from '@/hooks/useApiClient'
 import { Icon } from '@/components/icon'
 import { trackGenerateStart, trackGenerateComplete, trackPublishStart, trackPublishComplete } from '@/lib/analytics'
-import type { ApiResponse, UserProfile, GeneratedStoryDraft, StoryWithAudioUrl, PublishStatus, GenerateStatus } from '@mello/types'
+import type { ApiResponse, UserProfile, GeneratedStoryDraft, StoryWithAudioUrl, PublishStatus, GenerateStatus, NarratorVoice } from '@mello/types'
+
+const NARRATOR_VOICES: Array<{ id: NarratorVoice; label: string }> = [
+  { id: 'british', label: 'British' },
+  { id: 'indian', label: 'Indian' },
+  { id: 'american', label: 'American' },
+]
 
 type FlowState = 'prompt' | 'generating' | 'review' | 'publishing' | 'success'
 
@@ -78,6 +84,9 @@ export function CreateContent() {
   // Age tier selection
   const [selectedAge, setSelectedAge] = useState<number | null>(null)
 
+  // Narrator voice selection
+  const [selectedVoice, setSelectedVoice] = useState<NarratorVoice>('british')
+
   // Editable draft fields
   const [editTitle, setEditTitle] = useState('')
   const [editDescription, setEditDescription] = useState('')
@@ -105,8 +114,8 @@ export function CreateContent() {
 
   // Publish mutation — returns 202 immediately, Cloud Tasks does the work
   const publishMutation = useMutation({
-    mutationFn: (storyId: string) =>
-      client.post<{ id: string; publishStatus: string }>(`/v1/creator/stories/${storyId}/publish`),
+    mutationFn: ({ storyId, voice }: { storyId: string; voice: NarratorVoice }) =>
+      client.post<{ id: string; publishStatus: string }>(`/v1/creator/stories/${storyId}/publish`, { voice }),
     retry: false,
     onError: (err: Error) => {
       setError(err.message || 'Failed to publish. Please try again.')
@@ -226,13 +235,14 @@ export function CreateContent() {
     }
 
     trackPublishStart(draft.id)
-    publishMutation.mutate(draft.id)
-  }, [draft, editTitle, editDescription, editText, editTopics, saveMutation, publishMutation])
+    publishMutation.mutate({ storyId: draft.id, voice: selectedVoice })
+  }, [draft, editTitle, editDescription, editText, editTopics, selectedVoice, saveMutation, publishMutation])
 
   const handleReset = useCallback(() => {
     setState('prompt')
     setPrompt('')
     setSelectedAge(null)
+    setSelectedVoice('british')
     setDraft(null)
     setPublishedStory(null)
     setActiveStoryId(null)
@@ -486,7 +496,7 @@ export function CreateContent() {
             </div>
 
             {/* Age range */}
-            <div className="glass-card mb-6 rounded-[1.5rem] p-5">
+            <div className="glass-card mb-4 rounded-[1.5rem] p-5">
               <label className="mb-3 flex items-center gap-2">
                 <Icon name="child_care" size={16} className="text-primary/60" />
                 <span className="font-body text-xs uppercase tracking-widest text-on-surface-variant/60">
@@ -497,6 +507,31 @@ export function CreateContent() {
                 <span className="rounded-full bg-secondary-container px-4 py-2 font-body text-sm text-on-secondary-container">
                   {draft.ageMin}–{draft.ageMax} years
                 </span>
+              </div>
+            </div>
+
+            {/* Narrator voice */}
+            <div className="glass-card mb-6 rounded-[1.5rem] p-5">
+              <label className="mb-3 flex items-center gap-2">
+                <Icon name="record_voice_over" size={16} className="text-primary/60" />
+                <span className="font-body text-xs uppercase tracking-widest text-on-surface-variant/60">
+                  Narrator Voice
+                </span>
+              </label>
+              <div className="flex gap-3">
+                {NARRATOR_VOICES.map(({ id, label }) => (
+                  <button
+                    key={id}
+                    onClick={() => setSelectedVoice(id)}
+                    className={`flex-1 rounded-full px-4 py-3 font-body text-sm font-medium transition-all duration-300 ${
+                      selectedVoice === id
+                        ? 'bg-secondary-container text-on-secondary-container'
+                        : 'bg-surface-container-high/40 text-on-surface-variant hover:bg-surface-container-highest/60'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
             </div>
 

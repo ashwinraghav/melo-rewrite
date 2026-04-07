@@ -77,6 +77,12 @@ export interface UpdateDraftBody {
   ageMax?: number
 }
 
+export type NarratorVoice = 'british' | 'indian' | 'american'
+
+export interface PublishStoryBody {
+  voice?: NarratorVoice
+}
+
 export interface SearchStoriesBody {
   query: string
   childAge?: number

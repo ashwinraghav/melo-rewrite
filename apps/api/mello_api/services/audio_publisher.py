@@ -39,6 +39,7 @@ class AudioPublisherService(ABC):
         voice_id: str | None = None,
         audio_path_override: str | None = None,
         bucket_override: str | None = None,
+        age_min: int | None = None,
     ) -> PublishResult: ...
 
 
@@ -62,8 +63,30 @@ class ElevenLabsPublisher(AudioPublisherService):
         )
         self._storage = Storage()
 
-    async def _generate_with_timestamps(self, text: str, voice_id: str | None = None) -> dict:
+    @staticmethod
+    def _voice_settings_for_age(age_min: int | None) -> dict:
+        """Pick voice expressiveness based on target age group."""
+        if age_min is not None and age_min <= 2:
+            # Toddler (1-3): sing-song, animated, playful
+            return {
+                "stability": 0.50,
+                "similarity_boost": 0.65,
+                "style": 0.65,
+                "use_speaker_boost": True,
+            }
+        # Preschool (3-6): warm and engaging, moderately expressive
+        return {
+            "stability": 0.65,
+            "similarity_boost": 0.70,
+            "style": 0.45,
+            "use_speaker_boost": True,
+        }
+
+    async def _generate_with_timestamps(
+        self, text: str, voice_id: str | None = None, age_min: int | None = None,
+    ) -> dict:
         vid = voice_id or self._voice_id
+        voice_settings = self._voice_settings_for_age(age_min)
         with tracer.start_as_current_span(
             "elevenlabs.tts",
             attributes={
@@ -71,6 +94,7 @@ class ElevenLabsPublisher(AudioPublisherService):
                 "elevenlabs.voice_id": vid,
                 "elevenlabs.model_id": self._model_id,
                 "elevenlabs.text_length": len(text),
+                "elevenlabs.age_min": age_min or -1,
             },
         ) as span:
             t0 = time.monotonic()
@@ -81,12 +105,7 @@ class ElevenLabsPublisher(AudioPublisherService):
                     json={
                         "text": text,
                         "model_id": self._model_id,
-                        "voice_settings": {
-                            "stability": 0.75,
-                            "similarity_boost": 0.75,
-                            "style": 0.3,
-                            "use_speaker_boost": True,
-                        },
+                        "voice_settings": voice_settings,
                     },
                 )
                 resp.raise_for_status()
@@ -177,8 +196,9 @@ class ElevenLabsPublisher(AudioPublisherService):
         voice_id: str | None = None,
         audio_path_override: str | None = None,
         bucket_override: str | None = None,
+        age_min: int | None = None,
     ) -> PublishResult:
-        result = await self._generate_with_timestamps(story_text, voice_id=voice_id)
+        result = await self._generate_with_timestamps(story_text, voice_id=voice_id, age_min=age_min)
 
         audio_bytes = base64.b64decode(result["audio_base64"])
         alignment = result["alignment"]
@@ -212,6 +232,7 @@ class MockAudioPublisher(AudioPublisherService):
         voice_id: str | None = None,
         audio_path_override: str | None = None,
         bucket_override: str | None = None,
+        age_min: int | None = None,
     ) -> PublishResult:
         sentences = re.split(r'(?<=[.!?])\s+', story_text.strip())
         duration = int(len(story_text.split()) / 2.5)

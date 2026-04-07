@@ -34,3 +34,10 @@ class Config:
 
 
 config = Config()
+
+NARRATOR_VOICES: dict[str, str] = {
+    "british": "AXdMgz6evoL7OPd7eU12",
+    "indian": "2zRM7PkgwBPiau2jvVXc",
+    "american": "yj30vwTGJxSHezdAGsv9",
+}
+DEFAULT_NARRATOR_VOICE = "british"

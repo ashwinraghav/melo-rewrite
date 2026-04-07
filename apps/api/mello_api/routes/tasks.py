@@ -44,6 +44,7 @@ class GenerateStoryTask(BaseModel):
 
 class PublishStoryTask(BaseModel):
     storyId: str
+    voiceId: str | None = None
 
 class CloneVoiceTask(BaseModel):
     ownerUid: str
@@ -140,7 +141,11 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         try:
             with tracer.start_as_current_span("publish.generate_audio"):
                 await repos.stories.update(body.storyId, {"publish_step": "generating_audio"})
-                audio_result = await services.audio_publisher.publish(body.storyId, story.story_text)
+                audio_result = await services.audio_publisher.publish(
+                    body.storyId, story.story_text,
+                    voice_id=body.voiceId,
+                    age_min=story.age_min,
+                )
 
             with tracer.start_as_current_span("publish.create_cover"):
                 await repos.stories.update(body.storyId, {"publish_step": "creating_cover"})
@@ -216,12 +221,16 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         _auth: None = Depends(_verify_internal_request),
     ):
         try:
+            story = await repos.stories.find_by_id_any(body.storyId)
+            age_min = story.age_min if story else None
+
             result = await services.audio_publisher.publish(
                 body.storyId,
                 body.storyText,
                 voice_id=body.elevenLabsVoiceId,
                 audio_path_override=body.audioPath,
                 bucket_override=body.bucketOverride,
+                age_min=age_min,
             )
 
             await repos.conversions.update(body.uid, body.storyId, body.voiceId, {
