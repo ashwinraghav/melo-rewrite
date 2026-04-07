@@ -10,11 +10,10 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from ..middleware.auth import require_creator, AuthenticatedUser
 from ..config import NARRATOR_VOICES, DEFAULT_NARRATOR_VOICE
-from fastapi.responses import JSONResponse
 
 from ..models.story import (
     GenerateStoryRequest,
@@ -113,15 +112,11 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         body: UpdateDraftRequest,
         _user: AuthenticatedUser = Depends(require_creator),
     ):
-        """Edit a draft story's text/metadata before publishing."""
+        """Edit a story's text/metadata. Works on both drafts and published stories."""
 
         story = await repos.stories.find_by_id_any(story_id)
         if story is None:
             raise HTTPException(status_code=404, detail="Story not found")
-        if story.owner_uid and story.owner_uid != _user.uid:
-            raise HTTPException(status_code=403, detail="Not authorized")
-        if story.is_published:
-            raise HTTPException(status_code=400, detail="Cannot edit a published story")
 
         update_data = {k: v for k, v in body.model_dump().items() if v is not None}
         if not update_data:
@@ -144,7 +139,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
     @router.post("/stories/{story_id}/publish", status_code=202)
     async def publish_story(
         story_id: str,
-        body: PublishStoryRequest = Body(default=PublishStoryRequest()),
+        body: PublishStoryRequest | None = None,
         _user: AuthenticatedUser = Depends(require_creator),
     ):
         """Enqueue story publishing as a background task. Returns 202 immediately."""
@@ -152,13 +147,8 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         story = await repos.stories.find_by_id_any(story_id)
         if story is None:
             raise HTTPException(status_code=404, detail="Story not found")
-        if story.owner_uid and story.owner_uid != _user.uid:
-            raise HTTPException(status_code=403, detail="Not authorized")
-        if story.is_published:
-            raise HTTPException(status_code=400, detail="Story is already published")
-
         # Resolve narrator voice
-        voice_key = body.voice or DEFAULT_NARRATOR_VOICE
+        voice_key = (body.voice if body else None) or DEFAULT_NARRATOR_VOICE
         if voice_key not in NARRATOR_VOICES:
             raise HTTPException(status_code=400, detail=f"Unknown voice: {voice_key}")
 
@@ -185,7 +175,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         await services.task_queue.enqueue(
             "publish-story",
             {"storyId": story_id, "voiceId": NARRATOR_VOICES[voice_key]},
-            dedup_id=story_id,
+            dedup_id=f"{story_id}-{story.updated_at}",
         )
 
         return {"data": {"id": story_id, "publishStatus": "processing"}}
@@ -199,8 +189,6 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         story = await repos.stories.find_by_id_any(story_id)
         if story is None:
             raise HTTPException(status_code=404, detail="Story not found")
-        if story.owner_uid and story.owner_uid != _user.uid:
-            raise HTTPException(status_code=403, detail="Not authorized")
         result: dict = {
             "generateStatus": story.generate_status,
             "generateError": story.generate_error,

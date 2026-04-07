@@ -12,6 +12,8 @@ def make_router(repos: Repositories) -> APIRouter:
     async def resolve_story_urls(story: Story, include_text: bool = False) -> StoryWithAudioUrl:
         # Derive thumb path from cover path: stories/{id}/cover.webp → stories/{id}/thumb.webp
         thumb_path = story.cover_art_path.replace("/cover.webp", "/thumb.webp") if story.cover_art_path else ""
+        # Cache-bust audio/cover URLs with updated_at so republished content isn't served stale
+        cache_bust = f"?v={int(hash(story.updated_at) % 1_000_000)}" if story.updated_at else ""
         return StoryWithAudioUrl(
             id=story.id,
             title=story.title,
@@ -21,8 +23,8 @@ def make_router(repos: Repositories) -> APIRouter:
             age_min=story.age_min,
             age_max=story.age_max,
             topics=story.topics,
-            audio_url=await repos.stories.get_audio_public_url(story.audio_path),
-            cover_art_url=await repos.stories.get_cover_art_public_url(story.cover_art_path),
+            audio_url=await repos.stories.get_audio_public_url(story.audio_path) + cache_bust,
+            cover_art_url=await repos.stories.get_cover_art_public_url(story.cover_art_path) + cache_bust,
             cover_art_thumb_url=await repos.stories.get_cover_art_public_url(thumb_path) if thumb_path else "",
             story_text=story.story_text if include_text else None,
             segments=story.segments if include_text else None,

@@ -105,8 +105,8 @@ def test_update_draft(creator_client, repos):
     assert resp.json()["data"]["description"] == "New description"
 
 
-def test_update_published_story_fails(creator_client, repos):
-    """Cannot edit a story that has already been published."""
+def test_update_published_story_succeeds(creator_client, repos):
+    """Creators can edit published stories (for regenerate/republish flow)."""
     gen_resp = creator_client.post(
         "/v1/creator/generate",
         json={"prompt": "test", "age": 4},
@@ -120,14 +120,14 @@ def test_update_published_story_fails(creator_client, repos):
         headers=auth(TEST_UID),
     )
 
-    # Try to edit — should fail
+    # Edit should succeed
     resp = creator_client.patch(
         f"/v1/creator/stories/{story_id}",
-        json={"title": "Can't change this"},
+        json={"title": "Fixed Title"},
         headers=auth(TEST_UID),
     )
-    assert resp.status_code == 400
-    assert "published" in resp.json()["detail"].lower()
+    assert resp.status_code == 200
+    assert resp.json()["data"]["title"] == "Fixed Title"
 
 
 def test_update_nonexistent_story_fails(creator_client, repos):
@@ -167,7 +167,8 @@ def test_publish_story(creator_client, repos):
     assert story.cover_art_path != ""
 
 
-def test_publish_already_published_fails(creator_client, repos):
+def test_republish_story(creator_client, repos):
+    """Republishing a published story regenerates audio and succeeds."""
     gen_resp = creator_client.post(
         "/v1/creator/generate",
         json={"prompt": "test", "age": 4},
@@ -180,14 +181,19 @@ def test_publish_already_published_fails(creator_client, repos):
         f"/v1/creator/stories/{story_id}/publish",
         headers=auth(TEST_UID),
     )
+    story = asyncio.run(repos.stories.find_by_id(story_id))
+    assert story.is_published is True
 
-    # Publish again — should fail
+    # Republish — should succeed
     resp = creator_client.post(
         f"/v1/creator/stories/{story_id}/publish",
         headers=auth(TEST_UID),
     )
-    assert resp.status_code == 400
-    assert "already published" in resp.json()["detail"].lower()
+    assert resp.status_code == 202
+
+    story = asyncio.run(repos.stories.find_by_id(story_id))
+    assert story.is_published is True
+    assert story.publish_status == "ready"
 
 
 def test_publish_nonexistent_story_fails(creator_client, repos):
