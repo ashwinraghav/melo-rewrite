@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import Script from 'next/script'
-import { Plus_Jakarta_Sans, Lexend } from 'next/font/google'
+import { Plus_Jakarta_Sans, Lexend, Noto_Serif } from 'next/font/google'
 import '@/styles/globals.css'
 import { Suspense } from 'react'
 import { AuthProvider } from '@/context/auth-context'
@@ -19,6 +19,12 @@ const plusJakarta = Plus_Jakarta_Sans({
 const lexend = Lexend({
   subsets: ['latin'],
   variable: '--font-lexend',
+  display: 'swap',
+})
+
+const notoSerif = Noto_Serif({
+  subsets: ['latin'],
+  variable: '--font-noto-serif',
   display: 'swap',
 })
 
@@ -41,7 +47,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${plusJakarta.variable} ${lexend.variable}`}>
+    <html lang="en" className={`${plusJakarta.variable} ${lexend.variable} ${notoSerif.variable}`}>
       <head>
         {/* Preconnect to CDN and API so browsers warm connections early */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />

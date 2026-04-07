@@ -17,6 +17,7 @@ const config: Config = {
       fontFamily: {
         display: ['var(--font-plus-jakarta)', 'sans-serif'],
         body: ['var(--font-lexend)', 'sans-serif'],
+        serif: ['var(--font-noto-serif)', 'serif'],
       },
       colors: {
         // Backgrounds — stacked sheets of paper
