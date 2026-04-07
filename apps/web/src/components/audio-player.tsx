@@ -20,7 +20,7 @@ interface AudioPlayerProps {
 }
 
 const PROGRESS_REPORT_INTERVAL_S = 10
-const SPEEDS: number[] = [0.75, 1, 1.25]
+const SPEEDS: number[] = [0.75, 0.9, 1, 1.25]
 
 export function AudioPlayer({
   audioUrl,
