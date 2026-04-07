@@ -252,14 +252,23 @@ export function PlayerContent() {
         )}
 
         {isCreator ? (
-          <button
-            onClick={handleDelete}
-            disabled={deleteMutation.isPending}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-high/40 backdrop-blur-sm transition-all hover:bg-error/15"
-            aria-label="Delete story"
-          >
-            <Icon name="delete" size={20} className="text-on-surface-variant" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => router.push(`/create?storyId=${currentId}`)}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-high/40 backdrop-blur-sm transition-all hover:bg-primary/15"
+              aria-label="Regenerate story"
+            >
+              <Icon name="refresh" size={20} className="text-on-surface-variant" />
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-high/40 backdrop-blur-sm transition-all hover:bg-error/15"
+              aria-label="Delete story"
+            >
+              <Icon name="delete" size={20} className="text-on-surface-variant" />
+            </button>
+          </div>
         ) : (
           <div className="w-10" />
         )}
