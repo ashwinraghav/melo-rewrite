@@ -20,9 +20,10 @@ import CreatePage from '@/app/(app)/create/page'
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
 const mockPush = vi.fn()
+let mockSearchParams = new URLSearchParams()
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => mockSearchParams,
 }))
 
 vi.mock('@/context/auth-context', () => ({
@@ -113,6 +114,7 @@ const MOCK_PUBLISHED_STORY = {
     id: 'draft-123',
     title: 'The Gentle Breeze',
     description: 'A soft wind carries seeds.',
+    storyText: 'Once upon a time, a gentle breeze drifted across a quiet meadow.',
     durationSeconds: 120,
     durationCategory: 'short',
     ageMin: 1,
@@ -163,6 +165,7 @@ async function waitForReview() {
 describe('CreatePage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockSearchParams = new URLSearchParams()
     // Default: profile query returns accepted terms + creator flag
     mockGet.mockResolvedValue({ data: { isCreator: true, termsVersion: '1.0' } })
   })
@@ -272,6 +275,65 @@ describe('CreatePage', () => {
     expect(screen.getByRole('button', { name: /publish story/i })).toBeDisabled()
   })
 
+  // ── Voice picker ────────────────────────────────────────────────────
+
+  it('shows narrator voice picker in review state', async () => {
+    mockGenerateFlow()
+    renderWithQuery(<CreatePage />)
+    triggerGenerate()
+    await waitForReview()
+
+    expect(screen.getByText('British')).toBeInTheDocument()
+    expect(screen.getByText('Indian')).toBeInTheDocument()
+    expect(screen.getByText('American')).toBeInTheDocument()
+  })
+
+  it('defaults to British narrator voice', async () => {
+    mockGenerateFlow()
+    renderWithQuery(<CreatePage />)
+    triggerGenerate()
+    await waitForReview()
+
+    const britishButton = screen.getByText('British')
+    expect(britishButton.className).toContain('bg-secondary-container')
+  })
+
+  it('switches selected voice on click', async () => {
+    mockGenerateFlow()
+    renderWithQuery(<CreatePage />)
+    triggerGenerate()
+    await waitForReview()
+
+    fireEvent.click(screen.getByText('Indian'))
+
+    const indianButton = screen.getByText('Indian')
+    const britishButton = screen.getByText('British')
+    expect(indianButton.className).toContain('bg-secondary-container')
+    expect(britishButton.className).not.toContain('bg-secondary-container')
+  })
+
+  it('sends selected voice when publishing', async () => {
+    mockGenerateFlow()
+    renderWithQuery(<CreatePage />)
+    triggerGenerate()
+    await waitForReview()
+
+    fireEvent.click(screen.getByText('American'))
+
+    // Publish hangs (never resolves) so we can inspect the call without async leakage
+    mockPost.mockReturnValueOnce(new Promise(() => {}))
+
+    fireEvent.click(screen.getByRole('button', { name: /publish story/i }))
+
+    await waitFor(() => {
+      const publishCall = mockPost.mock.calls.find(
+        ([url]: [string]) => url.includes('/publish')
+      )
+      expect(publishCall).toBeDefined()
+      expect(publishCall![1]).toEqual({ voice: 'american' })
+    })
+  })
+
   // ── Start Over ──────────────────────────────────────────────────────
 
   it('resets to prompt state when Start Over is clicked', async () => {
@@ -289,6 +351,33 @@ describe('CreatePage', () => {
       expect(screen.getByPlaceholderText(/describe the story/i)).toBeInTheDocument()
       expect(screen.getByText('0/2000')).toBeInTheDocument()
     })
+  })
+
+  it('resets voice selection to British after Start Over', async () => {
+    mockGenerateFlow()
+    renderWithQuery(<CreatePage />)
+    triggerGenerate()
+    await waitForReview()
+
+    // Change voice to Indian
+    fireEvent.click(screen.getByText('Indian'))
+    expect(screen.getByText('Indian').className).toContain('bg-secondary-container')
+
+    // Start over — goes back to prompt
+    fireEvent.click(screen.getByRole('button', { name: /start over/i }))
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/describe the story/i)).toBeInTheDocument()
+    })
+
+    // Generate again with fresh mocks
+    mockPost.mockResolvedValueOnce(MOCK_GENERATE_ACCEPTED)
+    mockGet.mockResolvedValue(MOCK_STATUS_GENERATED)
+    triggerGenerate()
+    await waitForReview()
+
+    // British should be selected again
+    expect(screen.getByText('British').className).toContain('bg-secondary-container')
+    expect(screen.getByText('Indian').className).not.toContain('bg-secondary-container')
   })
 
   // ── Error handling ──────────────────────────────────────────────────
@@ -403,4 +492,7 @@ describe('CreatePage', () => {
       expect(screen.getByPlaceholderText(/describe the story/i)).toBeInTheDocument()
     })
   })
+
+  // Regenerate / republish tests are in create-regenerate.test.tsx
+  // (separate file to avoid OOM from accumulated React Query state)
 })

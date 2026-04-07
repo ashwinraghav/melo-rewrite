@@ -10,7 +10,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuthContext } from '@/context/auth-context'
@@ -40,6 +40,7 @@ function getPhase(index: number) {
 
 export function CreateContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user } = useAuthContext()
   const client = useApiClient()
 
@@ -97,6 +98,36 @@ export function CreateContent() {
   // Story ID being generated/published — drives the status poll
   const [activeStoryId, setActiveStoryId] = useState<string | null>(null)
 
+  // Track whether we're editing an existing published story (regenerate flow)
+  const [isRepublish, setIsRepublish] = useState(false)
+
+  // Load existing story from ?storyId= param (regenerate flow from player)
+  const editStoryId = searchParams.get('storyId')
+  useEffect(() => {
+    if (!editStoryId) return
+    client.get<StoryWithAudioUrl>(`/v1/stories/${editStoryId}`).then((resp) => {
+      const story = (resp as ApiResponse<StoryWithAudioUrl>).data
+      const d: GeneratedStoryDraft = {
+        id: story.id,
+        title: story.title,
+        description: story.description,
+        storyText: story.storyText ?? '',
+        topics: story.topics,
+        ageMin: story.ageMin,
+        ageMax: story.ageMax,
+        createdAt: story.createdAt,
+      }
+      setDraft(d)
+      setEditTitle(d.title)
+      setEditDescription(d.description)
+      setEditText(d.storyText)
+      setEditTopics(d.topics.join(', '))
+      setActiveStoryId(editStoryId)
+      setIsRepublish(true)
+      setState('review')
+    })
+  }, [editStoryId]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Generate mutation — returns 202 immediately, Cloud Tasks does the work
   const generateMutation = useMutation({
     mutationFn: ({ promptText, age }: { promptText: string; age: number }) =>
@@ -112,11 +143,15 @@ export function CreateContent() {
     },
   })
 
-  // Publish mutation — returns 202 immediately, Cloud Tasks does the work
+  // Publish mutation — returns 202 immediately, Cloud Tasks does the work.
+  // publishAccepted gates status polling so we don't poll before the server
+  // has updated publish_status to "processing" (prevents false instant-completion).
+  const [publishAccepted, setPublishAccepted] = useState(false)
   const publishMutation = useMutation({
     mutationFn: ({ storyId, voice }: { storyId: string; voice: NarratorVoice }) =>
       client.post<{ id: string; publishStatus: string }>(`/v1/creator/stories/${storyId}/publish`, { voice }),
     retry: false,
+    onSuccess: () => setPublishAccepted(true),
     onError: (err: Error) => {
       setError(err.message || 'Failed to publish. Please try again.')
       setState('review')
@@ -134,7 +169,7 @@ export function CreateContent() {
     draft?: GeneratedStoryDraft
   }
 
-  const isPolling = (state === 'generating' || state === 'publishing') && !!activeStoryId
+  const isPolling = (state === 'generating' || (state === 'publishing' && publishAccepted)) && !!activeStoryId
   const { data: statusData } = useQuery({
     queryKey: ['story-status', activeStoryId],
     queryFn: () => client.get<StoryStatus>(`/v1/creator/stories/${activeStoryId}/status`),
@@ -213,6 +248,7 @@ export function CreateContent() {
   const handlePublish = useCallback(async () => {
     if (!draft) return
     setError(null)
+    setPublishAccepted(false)
     setState('publishing')
     setPublishPhase(0)
 
@@ -246,6 +282,8 @@ export function CreateContent() {
     setDraft(null)
     setPublishedStory(null)
     setActiveStoryId(null)
+    setIsRepublish(false)
+    setPublishAccepted(false)
     setError(null)
     setPublishPhase(0)
   }, [])
@@ -543,8 +581,8 @@ export function CreateContent() {
                 className="flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-primary to-primary-dim px-6 py-4 font-body text-sm font-medium text-on-primary transition-all duration-300 hover:brightness-110 active:scale-[0.98] disabled:opacity-40"
                 whileTap={{ scale: 0.98 }}
               >
-                <Icon name="publish" size={18} />
-                Publish Story
+                <Icon name={isRepublish ? 'refresh' : 'publish'} size={18} />
+                {isRepublish ? 'Republish Story' : 'Publish Story'}
               </motion.button>
 
               <button
