@@ -175,7 +175,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
         await services.task_queue.enqueue(
             "publish-story",
             {"storyId": story_id, "voiceId": NARRATOR_VOICES[voice_key]},
-            dedup_id=f"{story_id}-{story.updated_at}",
+            dedup_id=f"{story_id}-{hash(story.updated_at) % 10**12}",
         )
 
         return {"data": {"id": story_id, "publishStatus": "processing"}}
