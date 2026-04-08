@@ -128,4 +128,25 @@ describe('CreatePage — regenerate flow', () => {
       expect(publishCall![1]).toEqual({ voice: 'british' })
     })
   })
+
+  it('does not poll status before publish POST returns', async () => {
+    renderWithQuery(<CreatePage />)
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('The Gentle Breeze')).toBeInTheDocument()
+    })
+
+    // Publish hangs — never resolves
+    mockPost.mockReturnValueOnce(new Promise(() => {}))
+    fireEvent.click(screen.getByRole('button', { name: /republish story/i }))
+
+    // Wait a tick for state to settle
+    await new Promise((r) => setTimeout(r, 100))
+
+    // No status poll should have fired — only the story load GET and profile GET
+    const statusCalls = mockGet.mock.calls.filter(
+      ([url]: [string]) => url.includes('/status')
+    )
+    expect(statusCalls).toHaveLength(0)
+  })
 })

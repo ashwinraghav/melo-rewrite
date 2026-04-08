@@ -11,7 +11,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuthContext } from '@/context/auth-context'
 import { useApiClient } from '@/hooks/useApiClient'
@@ -43,6 +43,7 @@ export function CreateContent() {
   const searchParams = useSearchParams()
   const { user } = useAuthContext()
   const client = useApiClient()
+  const queryClient = useQueryClient()
 
   const { data: profileResponse, isLoading: profileLoading } = useQuery({
     queryKey: ['me'],
@@ -270,9 +271,14 @@ export function CreateContent() {
       }
     }
 
+    // Clear cached status and story data so republish doesn't see stale "ready"
+    // status or serve old audio URLs from the CDN cache
+    queryClient.removeQueries({ queryKey: ['story-status', draft.id] })
+    queryClient.removeQueries({ queryKey: ['story', draft.id] })
+
     trackPublishStart(draft.id)
     publishMutation.mutate({ storyId: draft.id, voice: selectedVoice })
-  }, [draft, editTitle, editDescription, editText, editTopics, selectedVoice, saveMutation, publishMutation])
+  }, [draft, editTitle, editDescription, editText, editTopics, selectedVoice, saveMutation, publishMutation, queryClient])
 
   const handleReset = useCallback(() => {
     setState('prompt')
