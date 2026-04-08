@@ -41,7 +41,6 @@ class AudioPublisherService(ABC):
         audio_path_override: str | None = None,
         bucket_override: str | None = None,
         age_min: int | None = None,
-        pronunciation_map: dict[str, str] | None = None,
     ) -> PublishResult: ...
 
 
@@ -82,16 +81,14 @@ class ElevenLabsPublisher(AudioPublisherService):
         )
 
     @staticmethod
-    def _apply_pronunciation_map(text: str, pronunciation_map: dict[str, str]) -> str:
-        """Substitute words in text using pronunciation map (case-insensitive)."""
-        for word, alias in pronunciation_map.items():
-            text = re.sub(
-                r'\b' + re.escape(word) + r'\b',
-                alias,
-                text,
-                flags=re.IGNORECASE,
-            )
-        return text
+    def _prepare_for_tts(text: str) -> str:
+        """Replace 'word {alias}' with just 'alias' for TTS input."""
+        return re.sub(r'\S+\s*\{([^}]+)\}', r'\1', text)
+
+    @staticmethod
+    def _prepare_for_display(text: str) -> str:
+        """Strip '{alias}' hints, keeping the original word for display."""
+        return re.sub(r'\s*\{[^}]+\}', '', text)
 
     async def _generate_with_timestamps(
         self, text: str, voice_id: str | None = None, age_min: int | None = None,
@@ -211,12 +208,10 @@ class ElevenLabsPublisher(AudioPublisherService):
         audio_path_override: str | None = None,
         bucket_override: str | None = None,
         age_min: int | None = None,
-        pronunciation_map: dict[str, str] | None = None,
     ) -> PublishResult:
-        # Apply pronunciation substitutions for TTS, keep original for segments
-        tts_text = story_text
-        if pronunciation_map:
-            tts_text = self._apply_pronunciation_map(story_text, pronunciation_map)
+        # Inline pronunciation hints: "word {alias}" → TTS gets "alias", display gets "word"
+        tts_text = self._prepare_for_tts(story_text)
+        display_text = self._prepare_for_display(story_text)
 
         audio_bytes, alignment = await self._generate_with_timestamps(
             tts_text, voice_id=voice_id, age_min=age_min,
@@ -225,10 +220,10 @@ class ElevenLabsPublisher(AudioPublisherService):
         if alignment["character_end_times_seconds"]:
             duration = int(max(alignment["character_end_times_seconds"])) + 1
         else:
-            duration = int(len(story_text.split()) / 2.5)
+            duration = int(len(display_text.split()) / 2.5)
 
-        # Segments use original text so the UI shows correct spelling
-        segments = self._chars_to_sentence_segments(story_text, alignment)
+        # Segments use display text so the UI shows correct spelling
+        segments = self._chars_to_sentence_segments(display_text, alignment)
         audio_path = await self._upload_audio(
             story_id, audio_bytes,
             path_override=audio_path_override,
@@ -253,10 +248,10 @@ class MockAudioPublisher(AudioPublisherService):
         audio_path_override: str | None = None,
         bucket_override: str | None = None,
         age_min: int | None = None,
-        pronunciation_map: dict[str, str] | None = None,
     ) -> PublishResult:
-        sentences = re.split(r'(?<=[.!?])\s+', story_text.strip())
-        duration = int(len(story_text.split()) / 2.5)
+        display_text = ElevenLabsPublisher._prepare_for_display(story_text)
+        sentences = re.split(r'(?<=[.!?])\s+', display_text.strip())
+        duration = int(len(display_text.split()) / 2.5)
         time_per = duration / max(len(sentences), 1)
         segments = [
             {

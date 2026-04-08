@@ -538,3 +538,32 @@ def test_publish_with_empty_body_uses_default(creator_client, repos):
 
     story = asyncio.run(repos.stories.find_by_id(story_id))
     assert story.is_published is True
+
+
+def test_publish_strips_pronunciation_hints_from_segments(creator_client, repos):
+    """Pronunciation hints {alias} should be stripped from stored segments."""
+    gen_resp = creator_client.post(
+        "/v1/creator/generate",
+        json={"prompt": "test", "age": 4},
+        headers=auth(TEST_UID),
+    )
+    story_id = gen_resp.json()["data"]["id"]
+
+    # Manually inject hints into the story text
+    asyncio.run(repos.stories.update(story_id, {
+        "story_text": "Idli {idlee} bounced happily. Dosa {dohsa} laughed out loud.",
+    }))
+
+    resp = creator_client.post(
+        f"/v1/creator/stories/{story_id}/publish",
+        headers=auth(TEST_UID),
+    )
+    assert resp.status_code == 202
+
+    story = asyncio.run(repos.stories.find_by_id(story_id))
+    assert story.is_published is True
+    # Segments should show clean display text without hints
+    for seg in story.segments:
+        text = seg["text"] if isinstance(seg, dict) else seg.text
+        assert "{" not in text
+        assert "}" not in text

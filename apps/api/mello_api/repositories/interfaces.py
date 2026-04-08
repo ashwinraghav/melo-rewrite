@@ -16,7 +16,6 @@ if TYPE_CHECKING:
     from ..services.voice_cloner import VoiceClonerService
     from ..services.catalog_publisher import CatalogPublisherService
     from ..services.task_queue import TaskQueueService
-    from ..services.pronunciation import PronunciationService
 
 
 class StoryRepository(ABC):
@@ -157,4 +156,3 @@ class Services:
     voice_cloner: VoiceClonerService
     catalog_publisher: CatalogPublisherService
     task_queue: TaskQueueService
-    pronunciation: PronunciationService

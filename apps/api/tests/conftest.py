@@ -13,7 +13,6 @@ from mello_api.services.search import SearchService
 from mello_api.services.voice_cloner import MockVoiceCloner
 from mello_api.services.catalog_publisher import MockCatalogPublisher
 from mello_api.services.task_queue import SyncTaskQueue
-from mello_api.services.pronunciation import MockPronunciationService
 from tests.fixtures import STORIES
 
 
@@ -38,7 +37,6 @@ def services():
         voice_cloner=MockVoiceCloner(),
         catalog_publisher=MockCatalogPublisher(),
         task_queue=SyncTaskQueue(handler=_noop_handler),
-        pronunciation=MockPronunciationService(),
     )
 
 

@@ -46,6 +46,94 @@ class TestVoiceSettingsForAge:
             assert settings.use_speaker_boost is True
 
 
+# ── Unit: inline pronunciation hints ────────────────────────────────────
+
+class TestInlinePronunciation:
+    """Inline hints: 'word {alias}' → TTS gets alias, display gets word."""
+
+    def test_prepare_for_tts_replaces_word_with_alias(self):
+        text = '"How strange," said upma {oopma}.'
+        result = ElevenLabsPublisher._prepare_for_tts(text)
+        assert result == '"How strange," said oopma.'
+
+    def test_prepare_for_tts_multiple_hints(self):
+        text = "Idli {idlee} and Dosa {dohsa} are friends."
+        result = ElevenLabsPublisher._prepare_for_tts(text)
+        assert result == "idlee and dohsa are friends."
+
+    def test_prepare_for_tts_no_hints(self):
+        text = "A plain story with no hints."
+        result = ElevenLabsPublisher._prepare_for_tts(text)
+        assert result == text
+
+    def test_prepare_for_tts_hint_at_end_of_sentence(self):
+        text = "She loved sambar {saambar}."
+        result = ElevenLabsPublisher._prepare_for_tts(text)
+        assert result == "She loved saambar."
+
+    def test_prepare_for_tts_hint_with_comma_after(self):
+        text = "Idli {idlee}, round and fluffy."
+        result = ElevenLabsPublisher._prepare_for_tts(text)
+        assert "idlee" in result
+
+    def test_prepare_for_tts_multi_word_hint(self):
+        text = "She made upma {oop mah} today."
+        result = ElevenLabsPublisher._prepare_for_tts(text)
+        assert result == "She made oop mah today."
+
+    def test_prepare_for_display_strips_hints(self):
+        text = '"How strange," said upma {oopma}.'
+        result = ElevenLabsPublisher._prepare_for_display(text)
+        assert result == '"How strange," said upma.'
+
+    def test_prepare_for_display_multiple_hints(self):
+        text = "Idli {idlee} and Dosa {dohsa} are friends."
+        result = ElevenLabsPublisher._prepare_for_display(text)
+        assert result == "Idli and Dosa are friends."
+
+    def test_prepare_for_display_no_hints(self):
+        text = "A plain story with no hints."
+        result = ElevenLabsPublisher._prepare_for_display(text)
+        assert result == text
+
+    def test_prepare_for_display_preserves_punctuation(self):
+        text = "She loved sambar {saambar}!"
+        result = ElevenLabsPublisher._prepare_for_display(text)
+        assert result == "She loved sambar!"
+
+    def test_round_trip_consistency(self):
+        """Display text should never contain curly braces."""
+        text = "Idli {idlee} and Dosa {dohsa} swam in sambar {saambar}."
+        display = ElevenLabsPublisher._prepare_for_display(text)
+        assert "{" not in display
+        assert "}" not in display
+
+    def test_tts_text_never_contains_braces(self):
+        text = "Vada {vaada} is round."
+        tts = ElevenLabsPublisher._prepare_for_tts(text)
+        assert "{" not in tts
+        assert "}" not in tts
+
+
+class TestPublishWithHints:
+    """Integration: MockAudioPublisher handles hints in story text."""
+
+    def test_mock_publish_with_hints_returns_clean_segments(self):
+        pub = MockAudioPublisher()
+        text = "Idli {idlee} bounced. Dosa {dohsa} laughed."
+        result = asyncio.run(pub.publish("test-id", text))
+        for seg in result.segments:
+            assert "{" not in seg["text"]
+            assert "}" not in seg["text"]
+
+    def test_mock_publish_without_hints_unchanged(self):
+        pub = MockAudioPublisher()
+        text = "A plain story. No hints here."
+        result = asyncio.run(pub.publish("test-id", text))
+        assert result.segments[0]["text"] == "A plain story."
+        assert result.segments[1]["text"] == "No hints here."
+
+
 # ── MockAudioPublisher accepts age_min ───────────────────────────────────
 
 def test_mock_publisher_accepts_age_min():

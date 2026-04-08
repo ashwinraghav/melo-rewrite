@@ -28,7 +28,6 @@ from ..metrics import (
     story_publish_duration,
     voice_clones_completed,
 )
-from ..config import ACCENT_LABELS
 from ..models.story import StoryFilters, categorize_duration
 from ..repositories.interfaces import Repositories, Services
 
@@ -46,7 +45,6 @@ class GenerateStoryTask(BaseModel):
 class PublishStoryTask(BaseModel):
     storyId: str
     voiceId: str | None = None
-    accentKey: str | None = None
 
 class CloneVoiceTask(BaseModel):
     ownerUid: str
@@ -141,28 +139,12 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
 
         t0 = time.monotonic()
         try:
-            # Generate pronunciation map (non-fatal)
-            pron_map: dict[str, str] = {}
-            try:
-                with tracer.start_as_current_span("publish.pronunciation_map"):
-                    accent_key = body.accentKey or "british"
-                    accent_label = ACCENT_LABELS.get(accent_key, "British English")
-                    pron_map = await services.pronunciation.generate_map(
-                        story.story_text, accent_label,
-                    )
-            except Exception:
-                log.warning(
-                    "Pronunciation map failed for %s, proceeding without",
-                    body.storyId, exc_info=True,
-                )
-
             with tracer.start_as_current_span("publish.generate_audio"):
                 await repos.stories.update(body.storyId, {"publish_step": "generating_audio"})
                 audio_result = await services.audio_publisher.publish(
                     body.storyId, story.story_text,
                     voice_id=body.voiceId,
                     age_min=story.age_min,
-                    pronunciation_map=pron_map or None,
                 )
 
             with tracer.start_as_current_span("publish.create_cover"):
