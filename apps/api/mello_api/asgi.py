@@ -39,6 +39,7 @@ from .services.search import SearchService
 from .services.voice_cloner import ElevenLabsVoiceCloner
 from .services.catalog_publisher import GcsCatalogPublisher
 from .services.task_queue import CloudTaskQueue
+from .services.pronunciation import ClaudePronunciationService
 
 firebase_admin.initialize_app(options={"projectId": config.gcp_project_id})
 
@@ -90,6 +91,7 @@ if config.anthropic_api_key and config.elevenlabs_api_key:
             service_url=config.service_url,
             service_account_email=f"mello-api@{config.gcp_project_id}.iam.gserviceaccount.com",
         ),
+        pronunciation=ClaudePronunciationService(api_key=config.anthropic_api_key),
     )
 
 app = create_app(repos=repos, services=services, cors_origins=config.cors_origins)

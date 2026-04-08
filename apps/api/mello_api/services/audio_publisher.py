@@ -11,7 +11,8 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-import httpx
+from elevenlabs import VoiceSettings
+from elevenlabs.client import AsyncElevenLabs
 from gcloud.aio.storage import Storage
 from opentelemetry import trace
 
@@ -40,6 +41,7 @@ class AudioPublisherService(ABC):
         audio_path_override: str | None = None,
         bucket_override: str | None = None,
         age_min: int | None = None,
+        pronunciation_map: dict[str, str] | None = None,
     ) -> PublishResult: ...
 
 
@@ -57,34 +59,44 @@ class ElevenLabsPublisher(AudioPublisherService):
         self._voice_id = voice_id
         self._model_id = model_id
         self._bucket_name = bucket_name
-        self._client = httpx.AsyncClient(
-            headers={"xi-api-key": api_key},
-            timeout=120,
-        )
+        self._client = AsyncElevenLabs(api_key=api_key, timeout=120)
         self._storage = Storage()
 
     @staticmethod
-    def _voice_settings_for_age(age_min: int | None) -> dict:
+    def _voice_settings_for_age(age_min: int | None) -> VoiceSettings:
         """Pick voice expressiveness based on target age group."""
         if age_min is not None and age_min <= 2:
             # Toddler (1-3): sing-song, animated, playful
-            return {
-                "stability": 0.50,
-                "similarity_boost": 0.65,
-                "style": 0.65,
-                "use_speaker_boost": True,
-            }
+            return VoiceSettings(
+                stability=0.50,
+                similarity_boost=0.65,
+                style=0.65,
+                use_speaker_boost=True,
+            )
         # Preschool (3-6): warm and engaging, moderately expressive
-        return {
-            "stability": 0.65,
-            "similarity_boost": 0.70,
-            "style": 0.45,
-            "use_speaker_boost": True,
-        }
+        return VoiceSettings(
+            stability=0.65,
+            similarity_boost=0.70,
+            style=0.45,
+            use_speaker_boost=True,
+        )
+
+    @staticmethod
+    def _apply_pronunciation_map(text: str, pronunciation_map: dict[str, str]) -> str:
+        """Substitute words in text using pronunciation map (case-insensitive)."""
+        for word, alias in pronunciation_map.items():
+            text = re.sub(
+                r'\b' + re.escape(word) + r'\b',
+                alias,
+                text,
+                flags=re.IGNORECASE,
+            )
+        return text
 
     async def _generate_with_timestamps(
         self, text: str, voice_id: str | None = None, age_min: int | None = None,
-    ) -> dict:
+    ) -> tuple[bytes, dict]:
+        """Generate TTS with timestamps. Returns (audio_bytes, alignment_dict)."""
         vid = voice_id or self._voice_id
         voice_settings = self._voice_settings_for_age(age_min)
         with tracer.start_as_current_span(
@@ -99,20 +111,22 @@ class ElevenLabsPublisher(AudioPublisherService):
         ) as span:
             t0 = time.monotonic()
             try:
-                resp = await self._client.post(
-                    f"{self.API_BASE}/text-to-speech/{vid}/with-timestamps",
-                    headers={"Content-Type": "application/json"},
-                    json={
-                        "text": text,
-                        "model_id": self._model_id,
-                        "voice_settings": voice_settings,
-                    },
+                result = await self._client.text_to_speech.convert_with_timestamps(
+                    voice_id=vid,
+                    text=text,
+                    model_id=self._model_id,
+                    voice_settings=voice_settings,
                 )
-                resp.raise_for_status()
                 elevenlabs_request_duration.record(
                     time.monotonic() - t0, {"operation": "tts"}
                 )
-                return resp.json()
+                audio_bytes = base64.b64decode(result.audio_base_64)
+                alignment = {
+                    "characters": result.alignment.characters,
+                    "character_start_times_seconds": result.alignment.character_start_times_seconds,
+                    "character_end_times_seconds": result.alignment.character_end_times_seconds,
+                } if result.alignment else {"characters": [], "character_start_times_seconds": [], "character_end_times_seconds": []}
+                return audio_bytes, alignment
             except Exception as e:
                 elevenlabs_errors.add(1, {"operation": "tts"})
                 span.set_status(trace.StatusCode.ERROR, str(e))
@@ -197,17 +211,23 @@ class ElevenLabsPublisher(AudioPublisherService):
         audio_path_override: str | None = None,
         bucket_override: str | None = None,
         age_min: int | None = None,
+        pronunciation_map: dict[str, str] | None = None,
     ) -> PublishResult:
-        result = await self._generate_with_timestamps(story_text, voice_id=voice_id, age_min=age_min)
+        # Apply pronunciation substitutions for TTS, keep original for segments
+        tts_text = story_text
+        if pronunciation_map:
+            tts_text = self._apply_pronunciation_map(story_text, pronunciation_map)
 
-        audio_bytes = base64.b64decode(result["audio_base64"])
-        alignment = result["alignment"]
+        audio_bytes, alignment = await self._generate_with_timestamps(
+            tts_text, voice_id=voice_id, age_min=age_min,
+        )
 
         if alignment["character_end_times_seconds"]:
             duration = int(max(alignment["character_end_times_seconds"])) + 1
         else:
             duration = int(len(story_text.split()) / 2.5)
 
+        # Segments use original text so the UI shows correct spelling
         segments = self._chars_to_sentence_segments(story_text, alignment)
         audio_path = await self._upload_audio(
             story_id, audio_bytes,
@@ -233,6 +253,7 @@ class MockAudioPublisher(AudioPublisherService):
         audio_path_override: str | None = None,
         bucket_override: str | None = None,
         age_min: int | None = None,
+        pronunciation_map: dict[str, str] | None = None,
     ) -> PublishResult:
         sentences = re.split(r'(?<=[.!?])\s+', story_text.strip())
         duration = int(len(story_text.split()) / 2.5)

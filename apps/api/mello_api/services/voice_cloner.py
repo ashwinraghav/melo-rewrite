@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 import google.auth
-import httpx
+from elevenlabs.client import AsyncElevenLabs
 from gcloud.aio.storage import Storage
 from google.auth.transport.requests import Request as GoogleAuthRequest
 from google.cloud import storage as gcs_sync
@@ -50,14 +50,10 @@ class VoiceClonerService(ABC):
 
 
 class ElevenLabsVoiceCloner(VoiceClonerService):
-    API_BASE = "https://api.elevenlabs.io/v1"
 
     def __init__(self, api_key: str, firebase_bucket: str) -> None:
         self._firebase_bucket = firebase_bucket
-        self._client = httpx.AsyncClient(
-            headers={"xi-api-key": api_key},
-            timeout=60,
-        )
+        self._client = AsyncElevenLabs(api_key=api_key, timeout=60)
         self._storage = Storage()
         # Signed URL support — same pattern as FirestoreStoryRepository
         self._gcs_client = gcs_sync.Client()
@@ -82,19 +78,15 @@ class ElevenLabsVoiceCloner(VoiceClonerService):
         ) as span:
             t0 = time.monotonic()
             try:
-                resp = await self._client.post(
-                    f"{self.API_BASE}/voices/add",
-                    data={
-                        "name": f"mello-{name}",
-                        "description": f"Mello custom voice: {name}",
-                    },
-                    files={"files": ("sample.webm", audio_bytes, "audio/webm")},
+                voice = await self._client.voices.ivc.create(
+                    name=f"mello-{name}",
+                    files=[("sample.webm", audio_bytes, "audio/webm")],
+                    description=f"Mello custom voice: {name}",
                 )
-                resp.raise_for_status()
                 elevenlabs_request_duration.record(
                     time.monotonic() - t0, {"operation": "clone_voice"}
                 )
-                return CloneResult(eleven_labs_voice_id=resp.json()["voice_id"])
+                return CloneResult(eleven_labs_voice_id=voice.voice_id)
             except Exception as e:
                 elevenlabs_errors.add(1, {"operation": "clone_voice"})
                 span.set_status(trace.StatusCode.ERROR, str(e))
@@ -107,10 +99,7 @@ class ElevenLabsVoiceCloner(VoiceClonerService):
         ) as span:
             t0 = time.monotonic()
             try:
-                resp = await self._client.delete(
-                    f"{self.API_BASE}/voices/{eleven_labs_voice_id}",
-                )
-                resp.raise_for_status()
+                await self._client.voices.delete(voice_id=eleven_labs_voice_id)
                 elevenlabs_request_duration.record(
                     time.monotonic() - t0, {"operation": "delete_voice"}
                 )

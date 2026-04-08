@@ -9,41 +9,41 @@ from mello_api.services.audio_publisher import ElevenLabsPublisher, MockAudioPub
 class TestVoiceSettingsForAge:
     def test_toddler_age_1(self):
         settings = ElevenLabsPublisher._voice_settings_for_age(1)
-        assert settings["stability"] == 0.50
-        assert settings["style"] == 0.65
-        assert settings["similarity_boost"] == 0.65
+        assert settings.stability == 0.50
+        assert settings.style == 0.65
+        assert settings.similarity_boost == 0.65
 
     def test_toddler_age_2(self):
         settings = ElevenLabsPublisher._voice_settings_for_age(2)
-        assert settings["stability"] == 0.50
-        assert settings["style"] == 0.65
+        assert settings.stability == 0.50
+        assert settings.style == 0.65
 
     def test_preschool_age_3(self):
         settings = ElevenLabsPublisher._voice_settings_for_age(3)
-        assert settings["stability"] == 0.65
-        assert settings["style"] == 0.45
+        assert settings.stability == 0.65
+        assert settings.style == 0.45
 
     def test_preschool_age_5(self):
         settings = ElevenLabsPublisher._voice_settings_for_age(5)
-        assert settings["stability"] == 0.65
-        assert settings["style"] == 0.45
+        assert settings.stability == 0.65
+        assert settings.style == 0.45
 
     def test_none_defaults_to_preschool(self):
         """When age_min is unknown, use the less-aggressive preschool settings."""
         settings = ElevenLabsPublisher._voice_settings_for_age(None)
-        assert settings["stability"] == 0.65
-        assert settings["style"] == 0.45
+        assert settings.stability == 0.65
+        assert settings.style == 0.45
 
     def test_toddler_more_expressive_than_preschool(self):
         toddler = ElevenLabsPublisher._voice_settings_for_age(1)
         preschool = ElevenLabsPublisher._voice_settings_for_age(4)
-        assert toddler["style"] > preschool["style"]
-        assert toddler["stability"] < preschool["stability"]
+        assert toddler.style > preschool.style
+        assert toddler.stability < preschool.stability
 
     def test_all_settings_have_speaker_boost(self):
         for age in [None, 1, 2, 3, 5]:
             settings = ElevenLabsPublisher._voice_settings_for_age(age)
-            assert settings["use_speaker_boost"] is True
+            assert settings.use_speaker_boost is True
 
 
 # ── MockAudioPublisher accepts age_min ───────────────────────────────────

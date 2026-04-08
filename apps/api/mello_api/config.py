@@ -41,3 +41,9 @@ NARRATOR_VOICES: dict[str, str] = {
     "american": "yj30vwTGJxSHezdAGsv9",
 }
 DEFAULT_NARRATOR_VOICE = "british"
+
+ACCENT_LABELS: dict[str, str] = {
+    "british": "British English",
+    "indian": "Indian English",
+    "american": "American English",
+}

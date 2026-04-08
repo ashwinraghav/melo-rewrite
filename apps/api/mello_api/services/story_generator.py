@@ -77,6 +77,13 @@ AUDIO PACING:
 - Include at least 1 participation cue: "Can you moo like a cow?" or "Where did the bunny go?"
 - Do NOT include any square-bracket tags like [soft] or [whispers] in the story text.
 
+TTS AWARENESS — this story will be narrated by an AI text-to-speech engine (ElevenLabs):
+- Choose character names that are phonetically obvious in English (e.g., "Momo" not "Cèline").
+- Avoid words with ambiguous pronunciation (e.g., "read" past/present, "live" verb/adjective).
+- Spell out anything a TTS might misread: "three" not "3", "doctor" not "Dr."
+- If using loanwords or cultural terms, prefer ones with intuitive English pronunciation.
+- Keep onomatopoeia simple and recognizable: "whoosh", "splash", "buzz" — not invented spellings.
+
 TONE:
 - Calm, warm, soothing — like a parent whispering at bedtime.
 - Gentle humor through silly sounds and surprise.
@@ -126,6 +133,14 @@ AUDIO PACING:
 "Say it with me: ..."
 - Do NOT include any square-bracket tags like [soft] or [narration] in the story text.
 
+TTS AWARENESS — this story will be narrated by an AI text-to-speech engine (ElevenLabs):
+- Choose character names that are phonetically obvious in English (e.g., "Momo" not "Cèline").
+- Avoid words with ambiguous pronunciation (e.g., "read" past/present, "live" verb/adjective).
+- Spell out anything a TTS might misread: "three" not "3", "doctor" not "Dr."
+- If using loanwords or cultural terms, prefer ones with intuitive English pronunciation.
+- Keep onomatopoeia simple and recognizable: "whoosh", "splash", "buzz" — not invented spellings.
+- Avoid excessive caps, unusual punctuation, or formatting tricks — the TTS reads plain text.
+
 TONE:
 - Warm and energetic — a skilled storyteller performing for a small audience.
 - Show don't tell: convey emotions through action, body language, and dialogue, not exposition.
@@ -166,7 +181,7 @@ class StoryGeneratorService(ABC):
 
 
 class ClaudeStoryGenerator(StoryGeneratorService):
-    MODEL = "claude-opus-4-20250514"
+    MODEL = "claude-opus-4-6"
 
     def __init__(self, api_key: str) -> None:
         self._client = anthropic.AsyncAnthropic(api_key=api_key)

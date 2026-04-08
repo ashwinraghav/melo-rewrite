@@ -174,7 +174,7 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
 
         await services.task_queue.enqueue(
             "publish-story",
-            {"storyId": story_id, "voiceId": NARRATOR_VOICES[voice_key]},
+            {"storyId": story_id, "voiceId": NARRATOR_VOICES[voice_key], "accentKey": voice_key},
             dedup_id=f"{story_id}-{hash(story.updated_at) % 10**12}",
         )
 
