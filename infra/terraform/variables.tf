@@ -60,7 +60,7 @@ variable "elevenlabs_voice_id" {
 variable "elevenlabs_model_id" {
   description = "ElevenLabs model ID for TTS"
   type        = string
-  default     = "eleven_multilingual_v2"
+  default     = "eleven_v3"
 }
 
 variable "cohere_api_key" {

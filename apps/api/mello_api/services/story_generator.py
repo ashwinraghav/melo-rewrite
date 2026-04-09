@@ -53,6 +53,9 @@ or have awkward cadence.
    d. Participation: verify participation cues are present (see age-group rules).
    e. Refrain: confirm the refrain appears the required number of times, \
 with a meaningful pattern break or variation on the final occurrence.
+   f. Audio tags: verify each [tag] genuinely shifts delivery. Remove any tag \
+that doesn't change how the listener *feels* the moment. Never cluster more \
+than 2 tags together. Tags should read like stage directions, not decoration.
 5. Revise the draft if any audit check failed.
 6. Output ONLY the final JSON object — no commentary, no markdown fences."""
 
@@ -75,9 +78,17 @@ VOCABULARY:
 AUDIO PACING:
 - Use "..." for dramatic pauses before a reveal or repeated phrase.
 - Include at least 1 participation cue: "Can you moo like a cow?" or "Where did the bunny go?"
-- Do NOT include any square-bracket tags like [soft] or [whispers] in the story text.
 
-TTS AWARENESS — this story will be narrated by an AI text-to-speech engine (ElevenLabs):
+AUDIO TAGS — ElevenLabs v3 directives in square brackets that control vocal delivery. \
+Place before the phrase they affect. Think like a director giving stage directions.
+- Use sparingly: 2–4 tags total for a toddler story. Less is more.
+- Allowed tags: [warm], [soft], [whispers], [excited], [gasps], [giggles], [sings], [pause]
+- Example: '[warm] Once upon a time... [whispers] a tiny bunny was sleeping.'
+- Example: '[excited] Splash! [giggles] The duck jumped in the puddle!'
+- Do NOT use tags for accents, character voices, or anything jarring for a toddler.
+- Do NOT put the tag text in the spoken story — tags are invisible delivery cues.
+
+TTS AWARENESS — this story will be narrated by an AI text-to-speech engine (ElevenLabs v3):
 - Choose character names that are phonetically obvious in English (e.g., "Momo" not "Cèline").
 - Avoid words with ambiguous pronunciation (e.g., "read" past/present, "live" verb/adjective).
 - Spell out anything a TTS might misread: "three" not "3", "doctor" not "Dr."
@@ -92,7 +103,7 @@ Respond with ONLY a JSON object (no markdown, no code fences):
 {
   "title": "Short, engaging title (max 6 words)",
   "description": "One sentence summary (under 100 characters)",
-  "storyText": "The full story text with ... pauses inline. No square-bracket tags.",
+  "storyText": "The full story text with ... pauses and [audio tags] inline.",
   "topics": ["1–2 topic tags, e.g. animals, bedtime, nature, sounds"],
   "themes": "A thorough paragraph describing the deeper themes, lessons, emotions, and real-life situations this story addresses. Write as if explaining to a parent what their child will learn. Include specific scenarios. This text powers semantic search so parents can find stories by describing their child's situation.",
   "ageMin": 1,
@@ -131,9 +142,21 @@ AUDIO PACING:
 - Include 2–3 participation cues woven naturally into the story: \
 "Can you roar like a lion?", "What do you think she found behind the door?", \
 "Say it with me: ..."
-- Do NOT include any square-bracket tags like [soft] or [narration] in the story text.
 
-TTS AWARENESS — this story will be narrated by an AI text-to-speech engine (ElevenLabs):
+AUDIO TAGS — ElevenLabs v3 directives in square brackets that control vocal delivery. \
+Place before the phrase they affect. Think like a director giving stage directions.
+- Use 5–8 tags across the story. Place them at emotional turning points, not on every line.
+- Allowed tags: [warm], [soft], [whispers], [excited], [gasps], [giggles], [sings], \
+[pause], [dramatic], [building intensity], [softening], [rushed], [laughs], [sighs], \
+[silly voice], [reflective], [tender], [mysterious]
+- Example: '[dramatic] The door creaked open... [gasps] and there it was!'
+- Example: '[silly voice] "I am the KING of sandcastles!" he announced. [laughs]'
+- Example: '[softening] She sat down beside him. [tender] "It's okay," she whispered.'
+- Layer at most 2 tags together: '[whispers][mysterious] Something moved in the dark.'
+- Do NOT use accent tags — the narrator voice is consistent throughout.
+- Do NOT put the tag text in the spoken story — tags are invisible delivery cues.
+
+TTS AWARENESS — this story will be narrated by an AI text-to-speech engine (ElevenLabs v3):
 - Choose character names that are phonetically obvious in English (e.g., "Momo" not "Cèline").
 - Avoid words with ambiguous pronunciation (e.g., "read" past/present, "live" verb/adjective).
 - Spell out anything a TTS might misread: "three" not "3", "doctor" not "Dr."
@@ -158,7 +181,7 @@ Respond with ONLY a JSON object (no markdown, no code fences):
 {
   "title": "Short, engaging title (max 8 words)",
   "description": "One sentence summary (under 100 characters)",
-  "storyText": "The full story text with ... pauses and participation cues inline. No square-bracket tags.",
+  "storyText": "The full story text with ... pauses, participation cues, and [audio tags] inline.",
   "topics": ["1–3 topic tags, e.g. animals, friendship, bedtime, courage, nature"],
   "themes": "A thorough paragraph describing the deeper themes, lessons, emotions, and real-life situations this story addresses. Write as if explaining to a parent what their child will learn. Include specific scenarios like 'sibling jealousy', 'first day of school anxiety', 'learning to share with a new baby'. This text powers semantic search so parents can find stories by describing their child's situation.",
   "ageMin": 3,

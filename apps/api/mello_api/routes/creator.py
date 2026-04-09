@@ -39,10 +39,12 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
     async def _resolve_story_urls(story: Story) -> StoryWithAudioUrl:
         audio_url = ""
         cover_art_url = ""
+        # Cache-bust with updated_at so republished audio/cover isn't served stale
+        cache_bust = f"&v={int(hash(story.updated_at) % 1_000_000)}" if story.updated_at else ""
         if story.audio_path:
-            audio_url = await repos.stories.get_audio_signed_url(story.id, story.audio_path)
+            audio_url = await repos.stories.get_audio_signed_url(story.id, story.audio_path) + cache_bust
         if story.cover_art_path:
-            cover_art_url = await repos.stories.get_cover_art_signed_url(story.id, story.cover_art_path)
+            cover_art_url = await repos.stories.get_cover_art_signed_url(story.id, story.cover_art_path) + cache_bust
         return StoryWithAudioUrl(
             id=story.id,
             title=story.title,
@@ -172,6 +174,9 @@ def make_router(repos: Repositories, services: Services) -> APIRouter:
             "publish_error": "",
         })
 
+        # Re-fetch to get the updated_at from the status change above,
+        # ensuring the dedup ID is unique for each publish attempt.
+        story = await repos.stories.find_by_id_any(story_id)
         await services.task_queue.enqueue(
             "publish-story",
             {"storyId": story_id, "voiceId": NARRATOR_VOICES[voice_key]},

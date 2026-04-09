@@ -19,7 +19,7 @@ class Config:
     anthropic_api_key: str = os.environ.get("ANTHROPIC_API_KEY", "")
     elevenlabs_api_key: str = os.environ.get("ELEVENLABS_API_KEY", "")
     elevenlabs_voice_id: str = os.environ.get("ELEVENLABS_VOICE_ID", "AXdMgz6evoL7OPd7eU12")
-    elevenlabs_model_id: str = os.environ.get("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")
+    elevenlabs_model_id: str = os.environ.get("ELEVENLABS_MODEL_ID", "eleven_v3")
 
     # Search
     cohere_api_key: str = os.environ.get("COHERE_API_KEY", "")

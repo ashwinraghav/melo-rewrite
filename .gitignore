@@ -36,7 +36,10 @@ terraform.tfvars
 !vitest.config*.json
 !**/fixtures/**/*.json
 
-# Story generation output (audio files + manifest)
+# Audio files (test artifacts, story output)
+*.mp3
+*.wav
+*.webm
 scripts/stories-output/
 
 # Logs

@@ -6,6 +6,7 @@ ABC interface + production (ElevenLabs) and test (mock) implementations.
 from __future__ import annotations
 
 import base64
+import logging
 import re
 import time
 from abc import ABC, abstractmethod
@@ -15,6 +16,8 @@ from elevenlabs import VoiceSettings
 from elevenlabs.client import AsyncElevenLabs
 from gcloud.aio.storage import Storage
 from opentelemetry import trace
+
+log = logging.getLogger(__name__)
 
 from ..metrics import (
     gcs_operation_duration, gcs_errors,
@@ -83,13 +86,24 @@ class ElevenLabsPublisher(AudioPublisherService):
 
     @staticmethod
     def _prepare_for_tts(text: str) -> str:
-        """Replace 'word {alias}' with just 'alias' for TTS input."""
+        """Replace 'word {alias}' with just 'alias' for TTS input.
+
+        Audio tags like [whispers] are kept — ElevenLabs v3 uses them
+        as delivery directives.
+        """
         return re.sub(r'\S+\s*\{([^}]+)\}', r'\1', text)
 
     @staticmethod
     def _prepare_for_display(text: str) -> str:
-        """Strip '{alias}' hints, keeping the original word for display."""
-        return re.sub(r'\s*\{[^}]+\}', '', text)
+        """Strip '{alias}' hints and [audio tags], keeping original words."""
+        text = re.sub(r'\s*\{[^}]+\}', '', text)
+        text = re.sub(r'\[([^\]]*)\]\s*', '', text)
+        return text
+
+    @staticmethod
+    def _strip_audio_tags(text: str) -> str:
+        """Remove [audio tags] from text, preserving everything else."""
+        return re.sub(r'\[([^\]]*)\]\s*', '', text)
 
     async def _generate_with_timestamps(
         self, text: str, voice_id: str | None = None, age_min: int | None = None,
@@ -132,37 +146,38 @@ class ElevenLabsPublisher(AudioPublisherService):
 
     @staticmethod
     def _chars_to_sentence_segments(
-        tts_text: str, display_text: str, alignment: dict,
+        spoken_text: str, display_text: str, alignment: dict,
     ) -> list[dict]:
         """Convert character-level timestamps to sentence-level segments.
 
-        Character offsets are tracked against *tts_text* (which matches the
-        alignment data from ElevenLabs).  Display sentences are used for output
-        so the UI shows the original spelling, not pronunciation aliases.
+        Character offsets are tracked against *spoken_text* — the text that
+        ElevenLabs actually vocalises (pronunciation aliases resolved, audio
+        tags stripped).  Display sentences are used for output so the UI shows
+        the original spelling without tags or hints.
         """
         chars = alignment["characters"]
         starts = alignment["character_start_times_seconds"]
         ends = alignment["character_end_times_seconds"]
 
-        tts_sentences = re.split(r'(?<=[.!?])\s+', tts_text.strip())
+        spoken_sentences = re.split(r'(?<=[.!?])\s+', spoken_text.strip())
         display_sentences = re.split(r'(?<=[.!?])\s+', display_text.strip())
         segments: list[dict] = []
         char_offset = 0
 
-        for idx, tts_sentence in enumerate(tts_sentences):
-            tts_sentence = tts_sentence.strip()
-            if not tts_sentence:
+        for idx, spoken_sentence in enumerate(spoken_sentences):
+            spoken_sentence = spoken_sentence.strip()
+            if not spoken_sentence:
                 continue
 
             display_sentence = (
                 display_sentences[idx].strip()
                 if idx < len(display_sentences)
-                else tts_sentence
+                else spoken_sentence
             )
 
             sent_start = None
             sent_end = None
-            sent_char_count = len(tts_sentence)
+            sent_char_count = len(spoken_sentence)
             search_end = min(char_offset + sent_char_count + 10, len(chars))
 
             for i in range(char_offset, min(search_end, len(starts))):
@@ -224,12 +239,32 @@ class ElevenLabsPublisher(AudioPublisherService):
         bucket_override: str | None = None,
         age_min: int | None = None,
     ) -> PublishResult:
-        # Inline pronunciation hints: "word {alias}" → TTS gets "alias", display gets "word"
+        # Three text variants:
+        # - tts_text:     audio tags KEPT, pronunciation aliases resolved → sent to ElevenLabs
+        #                 v3 interprets [tags] as delivery cues; alignment includes tag chars
+        # - spoken_text:  tags stripped, aliases resolved → what the voice actually says
+        # - display_text: tags stripped, original words kept → shown in player UI
         tts_text = self._prepare_for_tts(story_text)
+        spoken_text = self._strip_audio_tags(tts_text)
         display_text = self._prepare_for_display(story_text)
+
+        audio_tags = re.findall(r'\[([^\]]+)\]', tts_text)
+        log.info(
+            "publish text-prep story=%s audio_tags=%d tags=%s "
+            "tts_len=%d spoken_len=%d display_len=%d",
+            story_id, len(audio_tags), audio_tags[:10],
+            len(tts_text), len(spoken_text), len(display_text),
+        )
 
         audio_bytes, alignment = await self._generate_with_timestamps(
             tts_text, voice_id=voice_id, age_min=age_min,
+        )
+
+        alignment_chars = len(alignment.get("characters", []))
+        log.info(
+            "publish alignment story=%s alignment_chars=%d tts_len=%d match=%s",
+            story_id, alignment_chars, len(tts_text),
+            alignment_chars == len(tts_text),
         )
 
         if alignment["character_end_times_seconds"]:
@@ -237,8 +272,11 @@ class ElevenLabsPublisher(AudioPublisherService):
         else:
             duration = int(len(display_text.split()) / 2.5)
 
-        # Segments use tts_text for offset tracking, display_text for output
         segments = self._chars_to_sentence_segments(tts_text, display_text, alignment)
+        log.info(
+            "publish segments story=%s count=%d duration=%ds",
+            story_id, len(segments), duration,
+        )
         audio_path = await self._upload_audio(
             story_id, audio_bytes,
             path_override=audio_path_override,
