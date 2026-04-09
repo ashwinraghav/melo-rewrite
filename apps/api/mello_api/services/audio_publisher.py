@@ -72,11 +72,12 @@ class ElevenLabsPublisher(AudioPublisherService):
                 style=0.65,
                 use_speaker_boost=True,
             )
-        # Preschool (3-6): warm and engaging, moderately expressive
+        # Preschool (3-6): deep and natural, consistent pronunciation
         return VoiceSettings(
-            stability=0.65,
-            similarity_boost=0.70,
-            style=0.45,
+            stability=0.46,
+            similarity_boost=0.68,
+            style=0.0,
+            speed=0.95,
             use_speaker_boost=True,
         )
 
@@ -130,24 +131,38 @@ class ElevenLabsPublisher(AudioPublisherService):
                 raise
 
     @staticmethod
-    def _chars_to_sentence_segments(text: str, alignment: dict) -> list[dict]:
-        """Convert character-level timestamps to sentence-level segments."""
+    def _chars_to_sentence_segments(
+        tts_text: str, display_text: str, alignment: dict,
+    ) -> list[dict]:
+        """Convert character-level timestamps to sentence-level segments.
+
+        Character offsets are tracked against *tts_text* (which matches the
+        alignment data from ElevenLabs).  Display sentences are used for output
+        so the UI shows the original spelling, not pronunciation aliases.
+        """
         chars = alignment["characters"]
         starts = alignment["character_start_times_seconds"]
         ends = alignment["character_end_times_seconds"]
 
-        sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+        tts_sentences = re.split(r'(?<=[.!?])\s+', tts_text.strip())
+        display_sentences = re.split(r'(?<=[.!?])\s+', display_text.strip())
         segments: list[dict] = []
         char_offset = 0
 
-        for sentence in sentences:
-            sentence = sentence.strip()
-            if not sentence:
+        for idx, tts_sentence in enumerate(tts_sentences):
+            tts_sentence = tts_sentence.strip()
+            if not tts_sentence:
                 continue
+
+            display_sentence = (
+                display_sentences[idx].strip()
+                if idx < len(display_sentences)
+                else tts_sentence
+            )
 
             sent_start = None
             sent_end = None
-            sent_char_count = len(sentence)
+            sent_char_count = len(tts_sentence)
             search_end = min(char_offset + sent_char_count + 10, len(chars))
 
             for i in range(char_offset, min(search_end, len(starts))):
@@ -162,7 +177,7 @@ class ElevenLabsPublisher(AudioPublisherService):
 
             if sent_start is not None and sent_end is not None:
                 segments.append({
-                    "text": sentence,
+                    "text": display_sentence,
                     "startTime": round(sent_start, 2),
                     "endTime": round(sent_end, 2),
                 })
@@ -222,8 +237,8 @@ class ElevenLabsPublisher(AudioPublisherService):
         else:
             duration = int(len(display_text.split()) / 2.5)
 
-        # Segments use display text so the UI shows correct spelling
-        segments = self._chars_to_sentence_segments(display_text, alignment)
+        # Segments use tts_text for offset tracking, display_text for output
+        segments = self._chars_to_sentence_segments(tts_text, display_text, alignment)
         audio_path = await self._upload_audio(
             story_id, audio_bytes,
             path_override=audio_path_override,
