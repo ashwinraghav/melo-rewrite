@@ -146,38 +146,48 @@ class ElevenLabsPublisher(AudioPublisherService):
 
     @staticmethod
     def _chars_to_sentence_segments(
-        spoken_text: str, display_text: str, alignment: dict,
+        tts_text: str, display_text: str, alignment: dict,
     ) -> list[dict]:
         """Convert character-level timestamps to sentence-level segments.
 
-        Character offsets are tracked against *spoken_text* — the text that
-        ElevenLabs actually vocalises (pronunciation aliases resolved, audio
-        tags stripped).  Display sentences are used for output so the UI shows
-        the original spelling without tags or hints.
+        Character offsets are tracked against *tts_text* — the exact string
+        sent to ElevenLabs, which includes audio tags and resolved aliases.
+        ElevenLabs v3 includes tag characters in its alignment data, so offsets
+        must match tts_text.  Display sentences are used for output so the UI
+        shows the original spelling without tags or hints.
         """
         chars = alignment["characters"]
         starts = alignment["character_start_times_seconds"]
         ends = alignment["character_end_times_seconds"]
 
-        spoken_sentences = re.split(r'(?<=[.!?])\s+', spoken_text.strip())
+        tts_sentences = re.split(r'(?<=[.!?])\s+', tts_text.strip())
         display_sentences = re.split(r'(?<=[.!?])\s+', display_text.strip())
         segments: list[dict] = []
         char_offset = 0
+        display_idx = 0
 
-        for idx, spoken_sentence in enumerate(spoken_sentences):
-            spoken_sentence = spoken_sentence.strip()
-            if not spoken_sentence:
+        for tts_sentence in tts_sentences:
+            tts_sentence = tts_sentence.strip()
+            if not tts_sentence:
+                continue
+
+            # Skip pure-tag "sentences" — e.g. a trailing "[laughs]" after "Hello!"
+            if re.fullmatch(r'(\[[^\]]*\]\s*)+', tts_sentence):
+                char_offset += len(tts_sentence)
+                while char_offset < len(chars) and chars[char_offset] in (' ', '\n', '\t'):
+                    char_offset += 1
                 continue
 
             display_sentence = (
-                display_sentences[idx].strip()
-                if idx < len(display_sentences)
-                else spoken_sentence
+                display_sentences[display_idx].strip()
+                if display_idx < len(display_sentences)
+                else re.sub(r'\[([^\]]*)\]\s*', '', tts_sentence)
             )
+            display_idx += 1
 
             sent_start = None
             sent_end = None
-            sent_char_count = len(spoken_sentence)
+            sent_char_count = len(tts_sentence)
             search_end = min(char_offset + sent_char_count + 10, len(chars))
 
             for i in range(char_offset, min(search_end, len(starts))):
@@ -239,21 +249,19 @@ class ElevenLabsPublisher(AudioPublisherService):
         bucket_override: str | None = None,
         age_min: int | None = None,
     ) -> PublishResult:
-        # Three text variants:
+        # Two text variants:
         # - tts_text:     audio tags KEPT, pronunciation aliases resolved → sent to ElevenLabs
         #                 v3 interprets [tags] as delivery cues; alignment includes tag chars
-        # - spoken_text:  tags stripped, aliases resolved → what the voice actually says
         # - display_text: tags stripped, original words kept → shown in player UI
         tts_text = self._prepare_for_tts(story_text)
-        spoken_text = self._strip_audio_tags(tts_text)
         display_text = self._prepare_for_display(story_text)
 
         audio_tags = re.findall(r'\[([^\]]+)\]', tts_text)
         log.info(
             "publish text-prep story=%s audio_tags=%d tags=%s "
-            "tts_len=%d spoken_len=%d display_len=%d",
+            "tts_len=%d display_len=%d",
             story_id, len(audio_tags), audio_tags[:10],
-            len(tts_text), len(spoken_text), len(display_text),
+            len(tts_text), len(display_text),
         )
 
         audio_bytes, alignment = await self._generate_with_timestamps(

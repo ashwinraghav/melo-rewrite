@@ -519,32 +519,34 @@ class TestPublishWithHints:
 # ── Text variant consistency ─────────────────────────────────────────────
 
 class TestTextVariantConsistency:
-    """Verify the three-text-variant pipeline: tts_text, spoken_text, display_text.
+    """Verify the two-text-variant pipeline: tts_text, display_text.
 
-    - tts_text:     audio tags KEPT, pronunciation aliases resolved
-    - spoken_text:  tags stripped, aliases resolved (what the voice says)
-    - display_text: tags stripped, original words kept (UI text)
+    - tts_text:     audio tags KEPT, pronunciation aliases resolved → ElevenLabs
+    - display_text: tags stripped, original words kept → player UI
     """
 
-    def test_three_variants_from_tagged_hinted_text(self):
+    def test_two_variants_from_tagged_hinted_text(self):
         original = "[warm] Idli {idlee} bounced. [whispers] Dosa {dohsa} slept."
         tts = ElevenLabsPublisher._prepare_for_tts(original)
-        spoken = ElevenLabsPublisher._strip_audio_tags(tts)
         display = ElevenLabsPublisher._prepare_for_display(original)
 
         assert "[warm]" in tts and "idlee" in tts      # tags kept, alias resolved
-        assert "[" not in spoken and "idlee" in spoken  # tags stripped, alias kept
         assert "[" not in display and "Idli" in display # tags stripped, original word
+
+    def test_strip_audio_tags_utility(self):
+        """_strip_audio_tags is still available for ad-hoc use (logging, etc)."""
+        tts = "[warm] idlee bounced."
+        stripped = ElevenLabsPublisher._strip_audio_tags(tts)
+        assert "[" not in stripped and "idlee" in stripped
 
     def test_plain_text_all_variants_identical(self):
         text = "A simple story. Nothing special."
         tts = ElevenLabsPublisher._prepare_for_tts(text)
-        spoken = ElevenLabsPublisher._strip_audio_tags(tts)
         display = ElevenLabsPublisher._prepare_for_display(text)
-        assert tts == spoken == display == text
+        assert tts == display == text
 
     def test_sentence_count_matches_across_variants(self):
-        """All three variants must split into the same number of sentences."""
+        """tts and display must split into the same number of content sentences."""
         import re
         original = (
             "[warm] Idli {idlee} bounced on the plate. "
@@ -552,11 +554,10 @@ class TestTextVariantConsistency:
             "The kitchen was a mess."
         )
         tts = ElevenLabsPublisher._prepare_for_tts(original)
-        spoken = ElevenLabsPublisher._strip_audio_tags(tts)
         display = ElevenLabsPublisher._prepare_for_display(original)
 
         split = lambda t: [s for s in re.split(r'(?<=[.!?])\s+', t.strip()) if s.strip()]
-        assert len(split(tts)) == len(split(spoken)) == len(split(display)) == 3
+        assert len(split(tts)) == len(split(display)) == 3
 
 
 # ── Observability / logging ──────────────────────────────────────────────
@@ -595,13 +596,11 @@ class TestPublishLogging:
             "Chai {chay} is perfect."
         )
         tts = ElevenLabsPublisher._prepare_for_tts(text)
-        spoken = ElevenLabsPublisher._strip_audio_tags(tts)
         display = ElevenLabsPublisher._prepare_for_display(text)
         audio_tags = re.findall(r'\[([^\]]+)\]', tts)
 
         assert audio_tags == ["excited", "soft"]
-        assert len(tts) > len(spoken) > 0
-        assert len(spoken) >= len(display)  # spoken has aliases, display has originals
+        assert len(tts) > len(display)
         assert "[" not in display
         assert "{" not in display
 
@@ -649,6 +648,10 @@ def test_toddler_publish_passes_age(creator_client, repos):
     assert published.is_published is True
     assert published.publish_status == "ready"
     assert published.audio_path != ""
+    # Segments must be clean — no raw tags or hints in display text
+    for seg in published.segments:
+        assert "[" not in seg["text"], f"Raw tag leaked into segment: {seg['text']}"
+        assert "{" not in seg["text"], f"Raw hint leaked into segment: {seg['text']}"
 
 
 def test_preschool_publish_passes_age(creator_client, repos):
@@ -671,3 +674,109 @@ def test_preschool_publish_passes_age(creator_client, repos):
     published = asyncio.run(repos.stories.find_by_id(story_id))
     assert published.is_published is True
     assert published.publish_status == "ready"
+
+
+# ── Edge cases: trailing tags, empty text, empty alignment ─────────────
+
+class TestTrailingTagGhostSegments:
+    """Trailing audio tags after a sentence terminator must not produce
+    ghost segments with raw tag text in the player UI."""
+
+    def test_trailing_single_tag(self):
+        """'Hello! [laughs]' must produce 1 segment, not 2."""
+        original = "That was amazing! [laughs]"
+        tts = ElevenLabsPublisher._prepare_for_tts(original)
+        display = ElevenLabsPublisher._prepare_for_display(original)
+        alignment = _fake_alignment(tts)
+
+        segments = ElevenLabsPublisher._chars_to_sentence_segments(
+            tts, display, alignment,
+        )
+        assert len(segments) == 1
+        assert segments[0]["text"] == "That was amazing!"
+        assert "[" not in segments[0]["text"]
+
+    def test_trailing_multiple_tags(self):
+        """'Hello! [laughs] [pause]' must produce 1 segment."""
+        original = "She smiled. [sighs] [soft]"
+        tts = ElevenLabsPublisher._prepare_for_tts(original)
+        display = ElevenLabsPublisher._prepare_for_display(original)
+        alignment = _fake_alignment(tts)
+
+        segments = ElevenLabsPublisher._chars_to_sentence_segments(
+            tts, display, alignment,
+        )
+        assert len(segments) == 1
+        assert segments[0]["text"] == "She smiled."
+
+    def test_trailing_tag_after_multi_sentence(self):
+        """Tags trailing a multi-sentence story don't create ghost segments."""
+        original = "She ran fast! The wind howled. [laughs]"
+        tts = ElevenLabsPublisher._prepare_for_tts(original)
+        display = ElevenLabsPublisher._prepare_for_display(original)
+        alignment = _fake_alignment(tts)
+
+        segments = ElevenLabsPublisher._chars_to_sentence_segments(
+            tts, display, alignment,
+        )
+        assert len(segments) == 2
+        assert segments[0]["text"] == "She ran fast!"
+        assert segments[1]["text"] == "The wind howled."
+        for seg in segments:
+            assert "[" not in seg["text"]
+
+    def test_no_segments_contain_raw_tags(self):
+        """No segment text should ever contain [ or ] brackets."""
+        original = (
+            "[warm] Idli {idlee} bounced on the plate. "
+            "[excited] Dosa {dohsa} rolled around. "
+            "[whispers] The kitchen was a mess. [laughs]"
+        )
+        tts = ElevenLabsPublisher._prepare_for_tts(original)
+        display = ElevenLabsPublisher._prepare_for_display(original)
+        alignment = _fake_alignment(tts)
+
+        segments = ElevenLabsPublisher._chars_to_sentence_segments(
+            tts, display, alignment,
+        )
+        for seg in segments:
+            assert "[" not in seg["text"], f"Raw tag in segment: {seg['text']}"
+            assert "]" not in seg["text"], f"Raw tag in segment: {seg['text']}"
+
+
+class TestEmptyAndEdgeCases:
+    """Edge cases that could crash or produce wrong output."""
+
+    def test_empty_alignment(self):
+        """Empty alignment data should produce no segments."""
+        alignment = {
+            "characters": [],
+            "character_start_times_seconds": [],
+            "character_end_times_seconds": [],
+        }
+        segments = ElevenLabsPublisher._chars_to_sentence_segments(
+            "Hello.", "Hello.", alignment,
+        )
+        assert segments == []
+
+    def test_single_word_sentence(self):
+        text = "Run!"
+        alignment = _fake_alignment(text)
+        segments = ElevenLabsPublisher._chars_to_sentence_segments(
+            text, text, alignment,
+        )
+        assert len(segments) == 1
+        assert segments[0]["text"] == "Run!"
+
+    def test_unicode_in_display_text(self):
+        """Cultural names with unicode should pass through correctly."""
+        original = "Théo {tayo} smiled."
+        tts = ElevenLabsPublisher._prepare_for_tts(original)
+        display = ElevenLabsPublisher._prepare_for_display(original)
+        alignment = _fake_alignment(tts)
+
+        segments = ElevenLabsPublisher._chars_to_sentence_segments(
+            tts, display, alignment,
+        )
+        assert len(segments) == 1
+        assert segments[0]["text"] == "Théo smiled."

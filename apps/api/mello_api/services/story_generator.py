@@ -268,10 +268,10 @@ class MockStoryGenerator(StoryGeneratorService):
                 title="The Sleepy Bunny",
                 description="A little bunny hops home to bed.",
                 story_text=(
-                    "Hop, hop, hop... "
+                    "[warm] Hop, hop, hop... "
                     "Little bunny hops. Hop, hop, hop. "
-                    "Can you hop like bunny? "
-                    "Hop, hop... sleep."
+                    "[soft] Can you hop like bunny? "
+                    "Hop, hop... [whispers] sleep."
                 ),
                 topics=["animals", "bedtime"],
                 themes=(
@@ -286,11 +286,11 @@ class MockStoryGenerator(StoryGeneratorService):
             title="The Gentle Breeze",
             description="A soft wind carries seeds across a meadow.",
             story_text=(
-                "Once upon a time, a gentle breeze drifted across a quiet meadow. "
+                "[warm] Once upon a time, a gentle breeze drifted across a quiet meadow. "
                 "It carried tiny seeds from flower to flower. "
-                "Each seed found a warm spot in the earth... "
+                "[soft] Each seed found a warm spot in the earth... "
                 "Can you blow like the wind? "
-                "By morning, new blossoms had opened their petals to the sun."
+                "[whispers] By morning, new blossoms {blah-sums} had opened their petals to the sun."
             ),
             topics=["nature"],
             themes=(
