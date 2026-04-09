@@ -42,10 +42,13 @@ STYLE_PROMPT = (
 )
 
 TOPIC_PALETTE = {
-    "park": "Use soft greens, warm yellows, and sky blues.",
-    "friends": "Use warm peaches, soft pinks, and gentle lavenders.",
-    "bedtime": "Use deep soft blues, lavenders, and moonlit silver tones.",
-    "food": "Use warm oranges, soft reds, gentle yellows, and cream tones.",
+    "emotions": "Use warm peaches, soft pinks, and gentle lavenders.",
+    "social": "Use warm yellows, soft peaches, and sky blues.",
+    "communication": "Use soft teals, warm greens, and gentle aquas.",
+    "boundaries": "Use soft blues, calm lavenders, and light grays.",
+    "change": "Use warm ambers, soft oranges, and golden yellows.",
+    "community": "Use soft greens, warm yellows, and sky blues.",
+    "safety": "Use deep soft blues, lavenders, and moonlit silver tones.",
 }
 
 MODEL = "imagen-3.0-generate-002"

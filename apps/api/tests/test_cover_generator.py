@@ -53,7 +53,7 @@ def test_build_cover_prompt_includes_title_and_description():
 
 
 def test_build_cover_prompt_uses_topic_palette():
-    prompt = build_cover_prompt("Night Story", "Sleepy time", ["bedtime"])
+    prompt = build_cover_prompt("Night Story", "Sleepy time", ["emotions"])
     assert "lavenders" in prompt
 
 

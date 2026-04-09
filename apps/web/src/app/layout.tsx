@@ -57,10 +57,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Firebase Auth token refresh/validation — warm connections before SDK needs them */}
         <link rel="preconnect" href="https://securetoken.googleapis.com" />
         <link rel="preconnect" href="https://identitytoolkit.googleapis.com" />
-        {/* Material Symbols Rounded — used throughout the Stitch Editorial Serenity design */}
+        {/* Material Symbols Rounded — display=swap so text renders before font loads */}
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=block"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=swap"
         />
       </head>
       <body>

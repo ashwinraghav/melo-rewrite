@@ -1,6 +1,7 @@
 """
 Story endpoint tests.
-Uses seed data matching the Stitch topic themes: park, friends, bedtime, food.
+Uses seed data matching the Stitch topic themes: emotions, social, communication,
+boundaries, change, community, safety.
 """
 from tests.conftest import auth
 from tests.fixtures import USER_ALICE
@@ -24,19 +25,17 @@ def test_list_returns_only_published(client):
     assert len(ids) == 7
 
 
-def test_filter_by_topic_park(client):
-    r = client.get("/v1/stories?topics=park", headers=auth(USER_ALICE))
+def test_filter_by_topic_emotions(client):
+    r = client.get("/v1/stories?topics=emotions", headers=auth(USER_ALICE))
     ids = {s["id"] for s in r.json()["data"]}
     assert "the-whispering-pines" in ids
+
+
+def test_filter_by_topic_community(client):
+    r = client.get("/v1/stories?topics=community", headers=auth(USER_ALICE))
+    ids = {s["id"] for s in r.json()["data"]}
     assert "playground-friends" in ids
     assert "picnic-adventure" in ids
-
-
-def test_filter_by_topic_bedtime(client):
-    r = client.get("/v1/stories?topics=bedtime", headers=auth(USER_ALICE))
-    ids = {s["id"] for s in r.json()["data"]}
-    assert "the-moons-nightcap" in ids
-    assert "sleepy-bear" in ids
 
 
 def test_filter_by_child_age(client):
@@ -66,10 +65,10 @@ def test_filter_by_duration_long(client):
 
 
 def test_combined_filters(client):
-    r = client.get("/v1/stories?childAge=4&topics=park", headers=auth(USER_ALICE))
+    r = client.get("/v1/stories?childAge=4&topics=community", headers=auth(USER_ALICE))
     ids = {s["id"] for s in r.json()["data"]}
-    assert "the-whispering-pines" in ids  # park, 2-8
-    assert "playground-friends" in ids     # park+friends, 3-8
+    assert "playground-friends" in ids     # community+social, 3-8
+    assert "picnic-adventure" in ids       # community+boundaries, 3-9
 
 
 def test_story_response_includes_signed_urls(client):

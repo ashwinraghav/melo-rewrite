@@ -1,5 +1,10 @@
 import { Suspense } from 'react'
-import { FavoritesContent } from './favorites-content'
+import dynamic from 'next/dynamic'
+
+const FavoritesContent = dynamic(
+  () => import('./favorites-content').then((m) => ({ default: m.FavoritesContent })),
+  { ssr: false },
+)
 
 function FavoritesSkeleton() {
   return (

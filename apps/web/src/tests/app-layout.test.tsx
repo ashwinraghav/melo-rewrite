@@ -103,13 +103,17 @@ describe('AppLayout', () => {
     })
   })
 
-  it('shows nothing while auth is loading', async () => {
+  it('hides content while auth is loading (after hydration)', async () => {
     mockLoading = true
     const AppLayout = await getAppLayout()
-    const { container } = renderLayout(<AppLayout><div data-testid="child">child</div></AppLayout>)
+    renderLayout(<AppLayout><div data-testid="child">child</div></AppLayout>)
 
-    expect(container.innerHTML).toBe('')
-    expect(screen.queryByTestId('child')).not.toBeInTheDocument()
+    // Before hydration effect fires, children render (for SSR HTML).
+    // After the effect, AuthGate returns null during auth loading.
+    await waitFor(() => {
+      expect(screen.queryByTestId('child')).not.toBeInTheDocument()
+    })
+    expect(screen.queryByTestId('bottom-nav')).not.toBeInTheDocument()
   })
 
   it('renders children when user is authenticated and terms are accepted', async () => {

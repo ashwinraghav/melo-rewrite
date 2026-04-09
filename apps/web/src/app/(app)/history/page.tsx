@@ -1,5 +1,10 @@
 import { Suspense } from 'react'
-import { HistoryContent } from './history-content'
+import dynamic from 'next/dynamic'
+
+const HistoryContent = dynamic(
+  () => import('./history-content').then((m) => ({ default: m.HistoryContent })),
+  { ssr: false },
+)
 
 function HistorySkeleton() {
   return (

@@ -15,29 +15,47 @@ import { trackPlayAll, trackStorySelected } from '@/lib/analytics'
 import type { PaginatedResponse, StoryWithAudioUrl } from '@mello/types'
 
 const TOPIC_META: Record<string, { label: string; subtitle: string; icon: string; accent: string }> = {
-  park: {
-    label: 'Going to the Park',
-    subtitle: 'Exploring nature and playing in the sunshine together.',
-    icon: 'park',
-    accent: 'text-tertiary',
-  },
-  friends: {
-    label: 'Making Friends',
-    subtitle: 'Kind words and sharing toys with new playmates.',
-    icon: 'groups',
-    accent: 'text-secondary',
-  },
-  bedtime: {
-    label: 'Bedtime Routine',
-    subtitle: 'Brushing teeth and cozying up for a peaceful night.',
-    icon: 'bedtime',
+  emotions: {
+    label: 'Emotions & Self',
+    subtitle: 'Understanding feelings and how to stay calm.',
+    icon: 'favorite',
     accent: 'text-primary',
   },
-  food: {
-    label: 'Trying New Foods',
-    subtitle: 'Discovering delicious flavors and colorful treats.',
-    icon: 'restaurant',
+  social: {
+    label: 'Social Basics',
+    subtitle: 'Learning how to play, share, and say hello.',
+    icon: 'group_work',
+    accent: 'text-secondary',
+  },
+  communication: {
+    label: 'Communication',
+    subtitle: 'Using our words and listening to others.',
+    icon: 'forum',
     accent: 'text-tertiary',
+  },
+  boundaries: {
+    label: 'Boundaries',
+    subtitle: 'Respecting personal space and being safe.',
+    icon: 'accessibility_new',
+    accent: 'text-primary',
+  },
+  change: {
+    label: 'Navigating Change',
+    subtitle: 'What to do during transitions and activities.',
+    icon: 'schedule',
+    accent: 'text-secondary',
+  },
+  community: {
+    label: 'Community',
+    subtitle: 'Visiting the park, the doctor, and meeting others.',
+    icon: 'public',
+    accent: 'text-tertiary',
+  },
+  safety: {
+    label: 'Safety',
+    subtitle: 'Staying close to caregivers and learning basic hygiene.',
+    icon: 'shield_with_heart',
+    accent: 'text-primary',
   },
 }
 
