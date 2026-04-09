@@ -34,7 +34,13 @@ export function AudioPlayer({
 }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null)
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const rafRef = useRef<number>(0)
   const prevUrlRef = useRef(audioUrl)
+
+  // Keep callbacks + durationSeconds in a ref so the rAF loop and event
+  // handlers always read the latest values without causing effect churn.
+  const cb = useRef({ onTimeUpdate, onPlayingChange, onProgress, onEnded, onError: onErrorCallback, durationSeconds })
+  cb.current = { onTimeUpdate, onPlayingChange, onProgress, onEnded, onError: onErrorCallback, durationSeconds }
 
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
@@ -54,7 +60,7 @@ export function AudioPlayer({
     setCurrentTime(0)
     setIsReady(false)
     setHasError(false)
-    onTimeUpdate?.(0)
+    cb.current.onTimeUpdate?.(0)
 
     // Load new source — canplay handler will trigger autoplay
     audio.load()
@@ -88,55 +94,65 @@ export function AudioPlayer({
     const audio = audioRef.current
     if (!audio) return
 
+    const tick = () => {
+      const t = audio.currentTime
+      setCurrentTime(t)
+      cb.current.onTimeUpdate?.(t)
+      rafRef.current = requestAnimationFrame(tick)
+    }
+
     const onPlay = () => {
       setIsPlaying(true)
-      onPlayingChange?.(true)
+      cb.current.onPlayingChange?.(true)
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = requestAnimationFrame(tick)
     }
     const onPause = () => {
       setIsPlaying(false)
-      onPlayingChange?.(false)
-    }
-    const onTime = () => {
-      const t = audio.currentTime
-      setCurrentTime(t)
-      onTimeUpdate?.(t)
+      cb.current.onPlayingChange?.(false)
+      cancelAnimationFrame(rafRef.current)
     }
     const onCanPlay = () => {
       setIsReady(true)
-      // Auto-play on ready (both initial load and track changes)
       if (autoPlay) {
         audio.play().catch(() => {})
       }
     }
     const onEndedEvt = () => {
+      cancelAnimationFrame(rafRef.current)
       setIsPlaying(false)
-      onPlayingChange?.(false)
-      onProgress?.(durationSeconds)
-      onEnded?.()
+      cb.current.onPlayingChange?.(false)
+      cb.current.onProgress?.(cb.current.durationSeconds)
+      cb.current.onEnded?.()
     }
     const onError = () => {
+      cancelAnimationFrame(rafRef.current)
       setHasError(true)
       setIsPlaying(false)
-      onPlayingChange?.(false)
-      onErrorCallback?.()
+      cb.current.onPlayingChange?.(false)
+      cb.current.onError?.()
     }
 
     audio.addEventListener('play', onPlay)
     audio.addEventListener('pause', onPause)
-    audio.addEventListener('timeupdate', onTime)
     audio.addEventListener('canplay', onCanPlay)
     audio.addEventListener('ended', onEndedEvt)
     audio.addEventListener('error', onError)
 
+    // If already playing (e.g. re-mount), start the loop
+    if (!audio.paused) {
+      rafRef.current = requestAnimationFrame(tick)
+    }
+
     return () => {
+      cancelAnimationFrame(rafRef.current)
       audio.removeEventListener('play', onPlay)
       audio.removeEventListener('pause', onPause)
-      audio.removeEventListener('timeupdate', onTime)
       audio.removeEventListener('canplay', onCanPlay)
       audio.removeEventListener('ended', onEndedEvt)
       audio.removeEventListener('error', onError)
     }
-  }, [durationSeconds, autoPlay, onProgress, onTimeUpdate, onPlayingChange, onEnded, onErrorCallback])
+  }, [autoPlay])
 
   // Set playback rate when speed changes
   useEffect(() => {
@@ -149,7 +165,7 @@ export function AudioPlayer({
     if (isPlaying) {
       progressTimerRef.current = setInterval(() => {
         if (audioRef.current) {
-          onProgress?.(Math.floor(audioRef.current.currentTime))
+          cb.current.onProgress?.(Math.floor(audioRef.current.currentTime))
         }
       }, PROGRESS_REPORT_INTERVAL_S * 1000)
     } else {
@@ -158,7 +174,7 @@ export function AudioPlayer({
     return () => {
       if (progressTimerRef.current) clearInterval(progressTimerRef.current)
     }
-  }, [isPlaying, onProgress])
+  }, [isPlaying])
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60)
